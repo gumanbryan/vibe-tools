@@ -1,0 +1,26 @@
+{
+  "name": "stock-daily",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build --base=./",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/unit/*.test.js tests/integration/*.test.js",
+    "data:probe": "node --use-env-proxy scripts/data/probe-sources.mjs",
+    "data:update": "node --use-env-proxy scripts/data/update.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@fontsource-variable/noto-sans-tc": "5.3.1",
+    "decimal.js": "10.6.0",
+    "lightweight-charts": "5.2.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "vite": "8.3.4"
+  }
+}
