@@ -33,7 +33,7 @@ export function positions(v) {
         `${num(p.marketPrice, 2)}<small class="block">${E(p.priceDate)}</small>`,
         num(p.marketValue),
         `<span class="${color(p.unrealized)}">${signed(p.unrealized)}</span>`,
-        p.opening ? button("delete-opening", "刪除起始持股", "ghost", `data-id="${E(p.id)}"`) : "請至交易紀錄操作",
+        p.opening ? button("edit-opening","編輯起始持股","ghost",`data-id="${E(p.id)}"`)+button("delete-opening", "刪除起始持股", "ghost", `data-id="${E(p.id)}"`) : "請至交易紀錄操作",
       ]),
     ),
     badge(rows.length + " 個批次"),

@@ -268,7 +268,7 @@ function makeView() {
 }
 function shell(content, page, title) {
   const hasBook = !!state.book;
-  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.7</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>行情截止 ${E(state.market?.asOf ?? "尚未載入")} · TWSE / TPEx</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
+  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.8</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>行情截止 ${E(state.market?.asOf ?? "尚未載入")} · TWSE / TPEx</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
 }
 function render() {
   try {
@@ -624,6 +624,58 @@ function tradeForm(original) {
   );
   wireTradeForm(form,{accounts:state.book.accounts,securities:state.market.securities},validate);
 }
+function openingPositionForm(original) {
+      const { form, validate } = dialog(
+        original?"編輯起始持股":"新增起始持股",
+        `<div class="form-grid">${selectAccount(original?.accountId)}${field("code", "商品代號", "text", original?.code??"", "required")}${field("acquiredDate","原始買進／建倉日期","date",original?.acquiredDate??state.book.openingDate,`required max="${state.book.openingDate}"`)}${select(
+          "creditType",
+          "部位類型",
+          [
+            ["cash", "現股"],
+            ["margin", "融資"],
+            ["short", "融券"],
+          ],
+          original?.creditType??"cash",
+        )}${field("qty", "起始股數", "number", original?.qty??"1000", 'min="1" step="1" required')}${field("price", "平均成本／融券賣價", "number", original?.price??"", 'min="0.01" step="0.01" required')}${field("marginRatio", "融資成數（%，例如60代表六成）", "number", original?.marginRatio?Number(original.marginRatio)*100:"60", 'min="0.01" max="100" step="0.01" required')}${field("principal", "未償融資本金（自動估算，可修改）", "number", original?.principal??"0", 'min="0.01" step="any" required')}${field("annualRate", "融資年利率（%，預設6.45）", "number", Number(original?.annualRate??DEFAULT_PROFILE.annualRate)*100, 'min="0" step="0.001" required')}${field("restricted", "已繳融券擔保款＋保證金", "number", original?.restricted??"0", 'min="0" step="0.01" required')}${field("interestStart","融資計息起日（買進T+2，可校正）","date",original?.interestStart??(original?state.book.openingDate:""),"required")}${field("accruedInterest", "啟用前已累計未付利息（自動估算，可修改）", "number", original?.accruedInterest??"0", 'min="0" step="any" required')}</div><input type="hidden" name="interestMode"><div class="button-row"><button type="button" id="opening-recalculate" class="btn secondary">依成數重算本金</button><button type="button" id="opening-interest-recalculate" class="btn secondary">依日期重估利息</button></div><p id="opening-principal-status" class="note"></p><p id="opening-interest-status" class="note"></p>${note("起始部位不再次扣現金；現金欄位應填投入這些部位後實際剩餘金額。融資成數用平均買進成本估算，不用目前股價。日期以帳本開始追蹤日為界，之後買進請新增交易；啟用前利息按本金、利率不變估算，若曾還款／調息，請填券商實際累計利息。")}`,
+        async (f) => {
+          if (!state.market.securities.some((s) => s.code === f.code.trim()))
+            throw Error("商品代號不存在");
+          const b = structuredClone(state.book);
+          const position={
+            ...original,
+            ...f,
+            code: f.code.trim(),
+            id: original?.id??newId(),
+            date: b.openingDate,
+            principal: f.creditType === "margin" ? dec(f.principal).toString() : "0",
+            marginRatio: f.creditType === "margin" ? dec(f.marginRatio).div(100).toString() : "0",
+            restricted: f.creditType === "short" ? dec(f.restricted).toString() : "0",
+            accruedInterest: f.creditType === "cash" ? "0" : dec(f.accruedInterest || "0").toString(),
+            annualRate: f.creditType === "margin" ? dec(f.annualRate || "6.45").div(100).toString() : "0",
+          };
+          if(original)b.openingPositions[b.openingPositions.findIndex(p=>p.id===original.id)]=position;
+          else b.openingPositions.push(position);
+          result(buildSnapshots(b,state.market,state.date));
+          if(original)await commitRepair(b,"編輯起始持股",original.id);
+          else await save(b, "新增起始部位", f.code);
+        },
+        "確認儲存",
+        (form) => {
+          const el = form.elements;
+          if (el.code.value && !state.market.securities.some(s => s.code === el.code.value.trim()))
+            el.code.setCustomValidity("查無商品，請核對股票／ETF代號");
+          if (el.creditType.value === "margin" && !(Number(el.principal.value) > 0))
+            el.principal.setCustomValidity("融資起始部位請填寫大於0的未償融資本金");
+          if(el.creditType.value==='margin'&&el.interestStart.value&&el.interestStart.value<el.acquiredDate.value)
+            el.interestStart.setCustomValidity('計息起日不可早於原始買進日');
+          if (el.creditType.value === "short" && !(Number(el.restricted.value) > 0))
+            el.restricted.setCustomValidity("融券起始部位請填寫已繳擔保款與保證金");
+        },
+      );
+      form.classList.add("trade-form");
+      wireOpeningPosition(form, state.book.accounts, validate,{openingDate:state.book.openingDate,calendar:state.market.calendar,original});
+}
+
 async function commitRepair(draft, kind, detail) {
   const previous = await exportBackup(state.book);
   const url = URL.createObjectURL(new Blob([previous], {type:"application/json"}));
@@ -837,48 +889,13 @@ async function action(name, target) {
         ),
       );
       break;
-    case "opening-position": {
-      const { form, validate } = dialog(
-        "新增起始持股",
-        `<div class="form-grid">${selectAccount()}${field("code", "商品代號", "text", "", "required")}${select(
-          "creditType",
-          "部位類型",
-          [
-            ["cash", "現股"],
-            ["margin", "融資"],
-            ["short", "融券"],
-          ],
-        )}${field("qty", "起始股數", "number", "1000", 'min="1" step="1" required')}${field("price", "平均成本／融券賣價", "number", "", 'min="0.01" step="0.01" required')}${field("marginRatio", "融資成數（%，例如60代表六成）", "number", "60", 'min="0.01" max="100" step="0.01" required')}${field("principal", "未償融資本金（自動估算，可修改）", "number", "0", 'min="0.01" step="any" required')}${field("annualRate", "融資年利率（%，預設6.45）", "number", "6.45", 'min="0" step="0.001" required')}${field("restricted", "已繳融券擔保款＋保證金", "number", "0", 'min="0" step="0.01" required')}${field("accruedInterest", "啟用前已累計未付利息", "number", "0", 'min="0" step="0.01" required')}</div><div class="button-row"><button type="button" id="opening-recalculate" class="btn secondary">依成數重算本金</button></div><p id="opening-principal-status" class="note"></p>${note("起始部位不再次扣現金；現金欄位應填投入這些部位後實際剩餘金額。融資成數用平均買進成本估算，不用目前股價。")}`,
-        async (f) => {
-          if (!state.market.securities.some((s) => s.code === f.code.trim()))
-            throw Error("商品代號不存在");
-          const b = structuredClone(state.book);
-          b.openingPositions.push({
-            ...f,
-            code: f.code.trim(),
-            id: newId(),
-            date: b.openingDate,
-            principal: f.creditType === "margin" ? dec(f.principal).toString() : "0",
-            marginRatio: f.creditType === "margin" ? dec(f.marginRatio).div(100).toString() : "0",
-            restricted: f.creditType === "short" ? dec(f.restricted).toString() : "0",
-            accruedInterest: f.creditType === "cash" ? "0" : dec(f.accruedInterest || "0").toString(),
-            annualRate: f.creditType === "margin" ? dec(f.annualRate || "6.45").div(100).toString() : "0",
-          });
-          result(valueAccount(b, state.market, state.date));
-          await save(b, "新增起始部位", f.code);
-        },
-        "確認儲存",
-        (form) => {
-          const el = form.elements;
-          if (el.code.value && !state.market.securities.some(s => s.code === el.code.value.trim()))
-            el.code.setCustomValidity("查無商品，請核對股票／ETF代號");
-          if (el.creditType.value === "margin" && !(Number(el.principal.value) > 0))
-            el.principal.setCustomValidity("融資起始部位請填寫大於0的未償融資本金");
-          if (el.creditType.value === "short" && !(Number(el.restricted.value) > 0))
-            el.restricted.setCustomValidity("融券起始部位請填寫已繳擔保款與保證金");
-        },
-      );
-      wireOpeningPosition(form, state.book.accounts, validate);
+    case "opening-position":
+      openingPositionForm();
+      break;
+    case "edit-opening": {
+      const position=state.book.openingPositions.find(p=>p.id===target.dataset.id);
+      if(!position)throw Error("找不到起始持股");
+      openingPositionForm(structuredClone(position));
       break;
     }
     case "cashflow":

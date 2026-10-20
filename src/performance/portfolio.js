@@ -243,7 +243,7 @@ export function valueAccount(book, market, date, accountId = null) {
           accounts.find((a) => a.id === p.accountId)?.profile.annualRate ??
           "",
         repayments: [],
-        interestStart: book.openingDate,
+        interestStart: p.creditType === "margin" && p.interestStart ? (p.interestStart > book.openingDate ? p.interestStart : book.openingDate) : book.openingDate,
       };
       lots.push(lot);
       if (p.creditType === "margin")
