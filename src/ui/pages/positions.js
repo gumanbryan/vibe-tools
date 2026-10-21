@@ -22,7 +22,7 @@ export function positions(v) {
         "成本價",
         "估值價格",
         "市值",
-        "未實現損益",
+        "扣費後未實現損益",
         "操作",
       ],
       rows.map((p) => [
@@ -32,7 +32,7 @@ export function positions(v) {
         num(p.price, 2),
         `${num(p.marketPrice, 2)}<small class="block">${E(p.priceDate)}</small>`,
         num(p.marketValue),
-        `<span class="${color(p.unrealized)}">${signed(p.unrealized)}</span>`,
+        `<button type="button" class="value-link ${color(p.unrealized)}" data-action="position-detail" data-id="${E(p.id)}">${signed(p.unrealized)} ↗</button>`,
         p.opening ? button("edit-opening","編輯起始持股","ghost",`data-id="${E(p.id)}"`)+button("delete-opening", "刪除起始持股", "ghost", `data-id="${E(p.id)}"`) : "請至交易紀錄操作",
       ]),
     ),

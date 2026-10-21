@@ -16,11 +16,11 @@ export function overview(v) {
     [
       "總淨資產",
       num(s?.equity),
-      `TWD · ${s?.quality === "complete" ? "計算完整" : "含暫估／待核對"}`,
+      `扣預估平倉費稅 · ${s?.quality === "complete" ? "計算完整" : "含暫估／待核對"}`,
       "wallet",
     ],
-    ["今日投資損益", signed(s?.pnl), "已排除當日入出金", "trend"],
-    ["累積投資報酬", pct(s?.return), "以單位淨值排除外部現金流", "return"],
+    ["今日資產變動", signed(s?.pnl), "包含當日入出金", "trend"],
+    ["累積資產變動率", pct(s?.return), "相對啟用日，包含入出金影響", "return"],
     [
       "待退手續費折讓",
       num(s?.balances?.rebateReceivable ?? 0, 2),
@@ -32,8 +32,8 @@ export function overview(v) {
   const marketEvents = v.reminders
     .filter((x) => x.type === "information")
     .slice(0, 3);
-  return `<div class="kpi-grid">${kpis.map(([l, n, sub], i) => `<section class="kpi card"><div class="kpi-label">${l}<span class="kpi-symbol">${["◈", "↗", "◎", "◷"][i]}</span></div><strong class="kpi-number ${i === 1 ? color(s?.pnl) : i === 2 ? color(s?.return) : ""}">${n}</strong><div class="kpi-sub">${sub}</div></section>`).join("")}</div>
- <div class="overview-grid">${card("資產成長軌跡", `<div class="chart-summary"><strong>${num(s?.unitNav, 4)} <small>單位淨值</small></strong><div class="legend"><span class="dot purple"></span>我的帳戶 <span class="dot gray"></span>加權指數 <span class="dot teal"></span>櫃買指數</div></div><div class="chart" id="performance-chart"></div>${note("共同起點＝100。個人績效包含股利及費用，基準為不含息價格報酬。")}`, badge("啟用日至今"))}${card(
+  return `<div class="kpi-grid">${kpis.map(([l, n, sub], i) => `<section class="kpi card"><div class="kpi-label">${l}<span class="kpi-symbol">${["◈", "↗", "◎", "◷"][i]}</span></div><strong class="kpi-number ${i === 1 ? color(s?.pnl) : i === 2 ? color(s?.return) : ""}">${i===0 ? `<button type="button" class="value-link" data-action="equity-detail" aria-label="查看淨資產明細">${n}<small> 查看明細 ↗</small></button>` : n}</strong><div class="kpi-sub">${sub}</div></section>`).join("")}</div>
+ <div class="overview-grid">${card("資產成長軌跡", `<div class="chart-summary"><strong>${num(s?.equity)} <small>元 · 扣費後淨資產</small></strong><label>圖表內容 <select id="asset-chart-mode" aria-label="圖表內容"><option value="amount" ${v.assetChartMode!=="comparison"?"selected":""}>資產金額（元）</option><option value="comparison" ${v.assetChartMode==="comparison"?"selected":""}>報酬比較</option></select></label></div><div class="legend"><span class="dot purple"></span>我的帳戶 ${v.assetChartMode==="comparison"?'<span class="dot" style="background:#2563eb"></span>加權指數 <span class="dot" style="background:#d97706"></span>櫃買指數':""}</div><div class="chart" id="performance-chart"></div>${note("資產金額直接顯示元；報酬比較以起點＝100，個人資產變動包含入出金，指數為不含息價格報酬，因此不代表純投資績效。")}`, badge("啟用日至今"))}${card(
    "每日市場筆記",
    `<div class="summary-date"><span class="tiny-label">MARKET BRIEF</span><span>${E(v.market.asOf)}</span></div><div class="summary-list">${v.summary.sentences
      .slice(0, 4)

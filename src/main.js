@@ -39,11 +39,9 @@ import {
 } from "./market/history-lock.js";
 import { taipeiToday, addBusinessDays } from "./domain/calendar.js";
 import { dec, sum } from "./domain/money.js";
-import {
-  buildSnapshots,
-  valueAccount,
-  latestPrice,
-} from "./performance/portfolio.js";
+import { latestPrice } from "./performance/portfolio.js";
+import {buildSnapshots,valueAccount} from "./performance/liquidation.js";
+import {equityDetails,positionDetails} from "./ui/valuation-details.js";
 import {
   periodThemeReturn,
   themeActivity,
@@ -76,6 +74,7 @@ const state = {
   weighting: "equal",
   marketSort: "volume-desc",
   indexCode: "TAIEX",
+  assetChartMode: "amount",
   cached: null,
 };
 let seeds = [];
@@ -169,6 +168,7 @@ function makeView() {
     state.weighting,
     state.indexCode,
     state.marketSort,
+    state.assetChartMode,
   ].join(":");
   if (state.cached?.key === key) return state.cached.value;
   const b = state.book,
@@ -268,14 +268,14 @@ function makeView() {
 }
 function shell(content, page, title) {
   const hasBook = !!state.book;
-  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.8</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>行情截止 ${E(state.market?.asOf ?? "尚未載入")} · TWSE / TPEx</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
+  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.9</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>行情截止 ${E(state.market?.asOf ?? "尚未載入")} · TWSE / TPEx</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
 }
 function render() {
   try {
     clearCharts();
     if (!state.book) {
       app.innerHTML = shell(
-        `<section class="welcome card"><div class="welcome-art">${icon(1)}</div><span class="eyebrow">A CLEARER VIEW OF YOUR PORTFOLIO</span><h2>從今天起，看清你的投資全貌。</h2><p>每日淨值、融資融券、交易費用與板塊輪動，<br>在同一個簡潔的工作台裡整理好。</p><div class="button-row">${button("create-book", "建立自己的帳本", "primary")}${button("demo", "載入模擬帳本")}</div><div class="welcome-features"><span>✓ 本機儲存</span><span>✓ 出入金不影響績效</span><span>✓ 市場資料從9/1累積</span></div></section>`,
+        `<section class="welcome card"><div class="welcome-art">${icon(1)}</div><span class="eyebrow">A CLEARER VIEW OF YOUR PORTFOLIO</span><h2>從今天起，看清你的投資全貌。</h2><p>每日淨值、融資融券、交易費用與板塊輪動，<br>在同一個簡潔的工作台裡整理好。</p><div class="button-row">${button("create-book", "建立自己的帳本", "primary")}${button("demo", "載入模擬帳本")}</div><div class="welcome-features"><span>✓ 本機儲存</span><span>✓ 資產金額與收付明細</span><span>✓ 市場資料從9/1累積</span></div></section>`,
         "overview",
         "資產總覽",
       );
@@ -314,7 +314,7 @@ function render() {
       title,
     );
     if (page === "overview")
-      performanceChart("performance-chart", v.snapshots, v.benchmarks);
+      performanceChart("performance-chart", v.snapshots, v.benchmarks, state.assetChartMode);
     if (page === "market")
       marketChart(
         "market-chart",
@@ -758,6 +758,12 @@ async function action(name, target) {
       ? makeView()
       : null;
   switch (name) {
+    case "equity-detail": {
+      const v=makeView();dialog("淨資產核對明細",equityDetails(v.latest,v.securityName),async()=>{},"關閉");break;
+    }
+    case "position-detail": {
+      const p=makeView().latest.positions.find(p=>p.id===target.dataset.id);if(p)dialog(`${p.code} 扣費後損益明細`,positionDetails(p),async()=>{},"關閉");break;
+    }
     case "market-correction": {
       const before = valueAccount(state.book, state.market, state.date),
         after = valueAccount(state.book, state.incomingMarket, state.date);
@@ -1307,6 +1313,7 @@ modal.addEventListener("click", (e) => {
 });
 document.addEventListener("change", async (e) => {
   try {
+    if(e.target.id === "asset-chart-mode"){state.assetChartMode=e.target.value;render();}
     if (e.target.id === "account-select") {
       state.account = e.target.value;
       render();

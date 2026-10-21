@@ -49,34 +49,34 @@ const clean = (rows) =>
         .map((x) => [x.time, x]),
     ).values(),
   ].sort((a, b) => a.time.localeCompare(b.time));
-export function performanceChart(id, snapshots, benchmarks) {
+export function performanceChart(id, snapshots, benchmarks, mode="amount") {
   const chart = chartAt(id);
   if (!chart) return;
   const mine = chart.addSeries(AreaSeries, {
     lineColor: "#7262db",
     topColor: "rgba(114,98,219,0.14)",
     bottomColor: "rgba(114,98,219,0)",
-    lineWidth: 2,
-    priceFormat: { type: "custom", formatter: (x) => x.toFixed(2) },
+    lineWidth: 3,
+    priceFormat: { type: "custom", formatter: (x) => x.toLocaleString("zh-TW",{maximumFractionDigits:mode==="amount"?0:2}) },
   });
   mine.setData(
     clean(
       snapshots
-        .filter((s) => s.unitNav != null)
-        .map((s) => ({ time: s.date, value: Number(s.unitNav) * 10 })),
+        .filter((s) => mode==="amount"?s.equity!=null:s.return!=null)
+        .map((s) => ({ time: s.date, value: mode==="amount"?Number(s.equity):(1+Number(s.return))*100 })),
     ),
   );
-  const colors = ["#b6bdcb", "#46a997", "#e0a64e"];
-  benchmarks.forEach((b, i) => {
+  const colors = ["#2563eb", "#d97706", "#16a34a"];
+  if(mode==="comparison")benchmarks.forEach((b, i) => {
     const data = b.bars.filter(
       (x) => x.date >= snapshots[0]?.date && x.date <= snapshots.at(-1)?.date,
     );
     const base = Number(data[0]?.close);
     if (!base) return;
     const line = chart.addSeries(LineSeries, {
-      color: colors[i % colors.length],
-      lineWidth: 1,
-      lineStyle: 2,
+      color: b.code === "TAIEX" ? "#2563eb" : b.code === "TPEX" ? "#d97706" : colors[i % colors.length],
+      lineWidth: 3,
+      lineStyle: 0,
     });
     line.setData(
       clean(
@@ -88,6 +88,7 @@ export function performanceChart(id, snapshots, benchmarks) {
     );
   });
   chart.timeScale().fitContent();
+  return chart;
 }
 export function marketChart(id, index, to) {
   const chart = chartAt(id);
