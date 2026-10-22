@@ -32,6 +32,8 @@ export function wireTradeForm(form,{accounts,securities},validate){
    el.annualRate.value=dec(p.annualRate||DEFAULT_PROFILE.annualRate).mul(100).toString();
   }
   const margin=el.creditType.value==='margin',day=!!el.dayType.value;
+  visible("actualPrincipal",margin&&el.side.value==="buy");
+  visible("actualCreditInterest",margin&&el.side.value==="sell");
   for(const key of ['marginRatio','annualRate'])visible(key,margin,true);
   visible('pairedTradeId',day);visible('dayQty',day);
   form.querySelector('[data-day-trade-help]').hidden=!day;

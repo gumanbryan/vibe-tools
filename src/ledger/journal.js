@@ -1,3 +1,4 @@
+import {financedPrincipal} from "../credit/financing.js";
 import { dec, sum } from "../domain/money.js";
 import { ok, err } from "../domain/result.js";
 import { addBusinessDays } from "../domain/calendar.js";
@@ -73,7 +74,7 @@ export function settleTrade(t, posted, date) {
     if (t.side === "buy") {
       lines.push(line("payable", g.plus(cost)));
       if (t.creditType === "margin") {
-        const loan = g.mul(t.ruleSnapshot.marginRatio);
+        const loan = dec(t.financedPrincipal??financedPrincipal(g.toString(),t.ruleSnapshot.marginRatio,t.actualPrincipal));
         lines.push(
           line("marginDebt", "0", loan),
           line("cash", "0", g.plus(cost).minus(loan)),
@@ -93,6 +94,8 @@ export function settleTrade(t, posted, date) {
           line("cash", "0", margin),
         );
       } else if (t.creditType === "margin") {
+        const rawInterest=dec(t.creditInterestRaw??0),interest=dec(t.creditInterest??0);
+        if(!rawInterest.isZero()||!interest.isZero())lines.push(line("interestPayable",rawInterest),line("cash","0",interest),signedLine("expense",interest.minus(rawInterest)));
         const principal = dec(t.principalRepaid ?? 0);
         lines.push(
           line("marginDebt", principal),

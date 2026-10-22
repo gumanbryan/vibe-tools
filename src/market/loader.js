@@ -1,3 +1,4 @@
+import {applyCalendarClosures} from "./calendar-closures.js";
 export async function verifyIntegrity(text, expected) {
   const bytes = await crypto.subtle.digest(
     "SHA-256",
@@ -44,6 +45,7 @@ export async function loadMarket(base = "./") {
       ),
     ),
   );
+  market.calendar=applyCalendarClosures(market.calendar);
   const rows = await get(
     manifest.meta?.indices?.path ?? "data/index-rows.json",
     manifest.meta?.indices?.version,

@@ -1,3 +1,4 @@
+import {financedPrincipal,closingInterest} from "../credit/financing.js";
 import { dec, D, sum } from "../domain/money.js";
 import { ok, err } from "../domain/result.js";
 import { datesBetween, addBusinessDays } from "../domain/calendar.js";
@@ -220,9 +221,7 @@ export function valueAccount(book, market, date, accountId = null) {
       const principal = dec(
         p.principal ??
           (p.creditType === "margin"
-            ? dec(p.qty)
-                .mul(p.price)
-                .mul(p.marginRatio ?? "0.6")
+            ? financedPrincipal(dec(p.qty).mul(p.price).toString(),p.marginRatio ?? "0.6")
             : 0),
       );
       const lot = {
@@ -336,6 +335,7 @@ export function valueAccount(book, market, date, accountId = null) {
       const t = { ...raw };
       const due = unwrap(addBusinessDays(t.date, 2, market.calendar));
       let qty = dec(t.qty);
+      if(t.creditType === "margin" && t.side === "buy")t.financedPrincipal=financedPrincipal(dec(t.qty).mul(t.price).toString(),t.ruleSnapshot.marginRatio,t.actualPrincipal);
       const short = t.creditType === "short";
       const cashShort = lots.filter(
         (l) =>
@@ -372,7 +372,7 @@ export function valueAccount(book, market, date, accountId = null) {
         if (t.side === "sell" && (t.creditDay || t.dayType === "cash-first"))
           candidates = [];
         let principal = dec(0),
-          released = dec(0);
+          released = dec(0), interestRaw=dec(0),interestCharged=dec(0);
         for (const target of candidates) {
           if (qty.isZero()) break;
           const lot = target._original ?? target;
@@ -384,7 +384,9 @@ export function valueAccount(book, market, date, accountId = null) {
           if (lot.creditType === "margin") {
             const p = dec(lot.principal).mul(q).div(lot.initialQty);
             principal = principal.plus(p);
-            lot.repayments.push({ date: due, principal: p.toString() });
+            const interest=closingInterest(lot,q.toString(),due);
+            interestRaw=interestRaw.plus(interest.raw);interestCharged=interestCharged.plus(interest.charged);
+            lot.repayments.push({ date: due, principal: p.toString(), interestRaw: interest.raw });
           }
           if (lot.creditType === "short") {
             lot.shortRepayments ??= [];
@@ -401,6 +403,13 @@ export function valueAccount(book, market, date, accountId = null) {
           }
         }
         t.principalRepaid = principal.toString();
+        if(t.creditType === "margin"){
+          t.creditInterestRaw=interestRaw.toString();
+          const actual=t.actualCreditInterest;
+          t.creditInterest=actual!=null&&actual!==""?dec(actual).toString():interestCharged.toString();
+          if(dec(t.creditInterest).lt(0))throw Error("融資利息不可為負");
+          t.creditInterestEstimated=actual==null||actual==="";
+        }
         t.collateralReleased = released.toString();
         if (qty.gt(0)) {
           const isFirst =
@@ -441,15 +450,14 @@ export function valueAccount(book, market, date, accountId = null) {
             : undefined,
           principal:
             t.creditType === "margin"
-              ? dec(t.qty)
-                  .mul(t.price)
-                  .mul(t.ruleSnapshot.marginRatio)
-                  .toString()
+              ? t.financedPrincipal
               : "0",
           annualRate: t.ruleSnapshot.annualRate,
           interestStart: due,
           repayments: [],
         });
+      const detail=prep.details.find(d=>d.id===(t.sourceTradeId??t.id));
+      if(detail && t.creditType === "margin")Object.assign(detail,{financedPrincipal:t.financedPrincipal,principalRepaid:t.principalRepaid,creditInterest:t.creditInterest,creditInterestEstimated:t.creditInterestEstimated});
       const posted = unwrap(
         postTrade(
           t,

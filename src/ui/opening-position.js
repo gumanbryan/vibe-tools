@@ -1,3 +1,4 @@
+import {financedPrincipal} from "../credit/financing.js";
 import {addBusinessDays} from "../domain/calendar.js";
 import {openingInterestEstimate} from "../credit/opening-interest.js";
 import {num} from "./helpers.js";
@@ -7,7 +8,7 @@ export function estimatedOpeningPrincipal(price,qty,ratio) {
   try {
     const p=dec(price),q=dec(qty),r=dec(ratio);
     if(p.lte(0)||q.lte(0)||!q.isInteger()||r.lte(0)||r.gt(100))return '';
-    return p.mul(q).mul(r).div(100).toString();
+    return financedPrincipal(p.mul(q).toString(),r.div(100).toString());
   }catch{return '';}
 }
 export function wireOpeningPosition(form,accounts,validate,{openingDate,calendar,original}={}) {
@@ -49,7 +50,7 @@ export function wireOpeningPosition(form,accounts,validate,{openingDate,calendar
         interestStatus.textContent='請填完整本金、利率與計息起日。買進日不在交易日曆內時，請手動填券商計息起日，不需下載更早的股價資料。';
       }
     }
-    status.textContent=manual?'本金已手動修改，後續變更成本、股數或成數會保留此金額；需要重新估算可按「依成數重算本金」。':'自動估算：平均成本 × 股數 × 融資成數。已還款者請直接改填券商目前的未償本金。';
+    status.textContent=manual?'本金已手動修改，後續變更成本、股數或成數會保留此金額；需要重新估算可按「依成數重算本金」。':'自動估算：平均成本 × 股數 × 融資成數，未滿千元捨去。已還款者請直接改填券商目前的未償本金。';
   }
   if(!original)defaults();update();validate();
   // Capture runs before the shared validation listener, so checks see new values.

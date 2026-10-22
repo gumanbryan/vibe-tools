@@ -1,3 +1,4 @@
+import {buildBusinessCalendar} from "./calendar.mjs";
 import {
   readFile,
   writeFile,
@@ -329,28 +330,7 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
   }));
   const tradingDates = [...new Set(out.bars.map((b) => b.date))].sort();
   out.asOf = tradingDates.at(-1) ?? null;
-  const holidaySet = new Set(
-    (out.holidayRows ?? [])
-      .filter((r) => /放假|休市|停止交易/.test(JSON.stringify(r)))
-      .map((r) => isoDate(r.Date ?? r["日期"]))
-      .filter(Boolean),
-  );
-  const futureEnd = new Date(end + "T00:00:00Z");
-  futureEnd.setUTCDate(futureEnd.getUTCDate() + 20);
-  out.calendar = {
-    businessDates: [
-      ...new Set([
-        ...tradingDates,
-        ...days(end, futureEnd.toISOString().slice(0, 10)).filter(
-          (d) => !holidaySet.has(d),
-        ),
-      ]),
-    ].sort(),
-    sourceVersion: "official-history-and-holiday-schedule",
-    futureStatus: out.holidayRows
-      ? "holiday-filtered-estimate"
-      : "unverified-weekdays",
-  };
+  out.calendar=buildBusinessCalendar(tradingDates,end,out.holidayRows);
   const manifest = {
     schemaVersion: 1,
     startDate: START,

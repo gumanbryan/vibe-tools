@@ -50,6 +50,8 @@ export function positions(v) {
        "原始手續費",
        "待退折讓",
        "交易稅",
+       "融資本金／還款",
+       "交割融資利息",
        "操作",
      ],
      v.book.trades
@@ -70,6 +72,8 @@ export function positions(v) {
            num(d?.grossFee, 2),
            num(d?.rebate, 2),
            num(d?.tax),
+           t.creditType === "margin" ? num(t.side === "buy" ? d?.financedPrincipal : d?.principalRepaid) : "—",
+           t.creditType === "margin" && t.side === "sell" ? num(d?.creditInterest)+`<small class="block">${d?.creditInterestEstimated?"預估，可依帳單校正":"依券商實填"}</small>` : "—",
            button("edit-trade", "修訂", "ghost", `data-id="${E(t.id)}"`) + button("delete-trade", "刪除", "ghost", `data-id="${E(t.id)}"`),
          ];
        }),
