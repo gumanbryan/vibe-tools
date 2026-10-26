@@ -12,3 +12,15 @@ export function boundedChartRange(range,count){
  const from=Math.max(-0.5,Math.min(range.from,count-0.5-span));
  return {from,to:from+span};
 }
+
+// Chart dates come from observed sessions; accounting snapshots remain daily.
+export function performanceSnapshots(snapshots, market) {
+ const benchmarkBars=(market.indices??[]).flatMap(index=>chartBars(index,market.asOf));
+ const observations=benchmarkBars.length?benchmarkBars:chartBars({bars:market.bars??[]},market.asOf);
+ const observed=new Set(observations.map(bar=>bar.date));
+ const holidays=new Set(market.calendar?.holidayDates??[]);
+ return snapshots.filter(snapshot=>{
+  const day=new Date(snapshot.date+'T00:00:00Z').getUTCDay();
+  return day!==0&&day!==6&&!holidays.has(snapshot.date)&&observed.has(snapshot.date);
+ });
+}

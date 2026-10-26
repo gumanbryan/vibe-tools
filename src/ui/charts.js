@@ -1,4 +1,4 @@
-import {chartBars,boundedChartRange} from "./market-data.js";
+import {chartBars,boundedChartRange,performanceSnapshots} from "./market-data.js";
 import {
   createChart,
   LineSeries,
@@ -49,7 +49,8 @@ const clean = (rows) =>
         .map((x) => [x.time, x]),
     ).values(),
   ].sort((a, b) => a.time.localeCompare(b.time));
-export function performanceChart(id, snapshots, benchmarks, mode="amount") {
+export function performanceChart(id, snapshots, benchmarks, mode="amount", market={indices:benchmarks}) {
+  snapshots=performanceSnapshots(snapshots,market);
   const chart = chartAt(id);
   if (!chart) return;
   const mine = chart.addSeries(AreaSeries, {
@@ -68,9 +69,8 @@ export function performanceChart(id, snapshots, benchmarks, mode="amount") {
   );
   const colors = ["#2563eb", "#d97706", "#16a34a"];
   if(mode==="comparison")benchmarks.forEach((b, i) => {
-    const data = b.bars.filter(
-      (x) => x.date >= snapshots[0]?.date && x.date <= snapshots.at(-1)?.date,
-    );
+    const visibleDates=new Set(snapshots.map(s=>s.date));
+    const data = chartBars(b).filter(x=>visibleDates.has(x.date));
     const base = Number(data[0]?.close);
     if (!base) return;
     const line = chart.addSeries(LineSeries, {
