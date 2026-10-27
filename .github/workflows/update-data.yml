@@ -1,8 +1,10 @@
 name: Refresh public market data
 on:
   schedule:
-    - cron: '37 10 * * *'
-    - cron: '17 13 * * *'
+    # UTC cron; Taiwan (Asia/Taipei) is UTC+8.
+    - cron: '17 7 * * *'   # 15:17 Taiwan
+    - cron: '17 8 * * *'   # 16:17 Taiwan
+    - cron: '17 13 * * *'  # 21:17 Taiwan: retry later data publication
   workflow_dispatch:
 permissions:
   contents: write
