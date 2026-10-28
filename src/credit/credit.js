@@ -11,7 +11,7 @@ export function accrueInterest(lot, fromDate, toDate, rule) {
     const daily = datesBetween(fromDate, toDate).map((date) => {
       const repaid = sum(
         (lot.repayments ?? [])
-          .filter((x) => x.date <= date)
+          .filter((x) => (x.interestDate ?? x.date) <= date)
           .map((x) => x.principal),
       );
       const principal = dec(lot.principal).minus(repaid);

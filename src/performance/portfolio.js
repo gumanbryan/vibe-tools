@@ -1,4 +1,4 @@
-import {financedPrincipal,closingInterest} from "../credit/financing.js";
+import {financedPrincipal,closingInterest,marginInterestDates} from "../credit/financing.js";
 import { dec, D, sum } from "../domain/money.js";
 import { ok, err } from "../domain/result.js";
 import { datesBetween, addBusinessDays } from "../domain/calendar.js";
@@ -334,6 +334,8 @@ export function valueAccount(book, market, date, accountId = null) {
       applyStockGrants(raw.date);
       const t = { ...raw };
       const due = unwrap(addBusinessDays(t.date, 2, market.calendar));
+      const interestPolicy=accounts.find(a=>a.id===t.accountId)?.creditInterestPolicy??"standard";
+      const interestDates=marginInterestDates(t,due,interestPolicy,market.calendar);
       let qty = dec(t.qty);
       if(t.creditType === "margin" && t.side === "buy")t.financedPrincipal=financedPrincipal(dec(t.qty).mul(t.price).toString(),t.ruleSnapshot.marginRatio,t.actualPrincipal);
       const short = t.creditType === "short";
@@ -373,6 +375,7 @@ export function valueAccount(book, market, date, accountId = null) {
           candidates = [];
         let principal = dec(0),
           released = dec(0), interestRaw=dec(0),interestCharged=dec(0);
+        const interestParts=[];
         for (const target of candidates) {
           if (qty.isZero()) break;
           const lot = target._original ?? target;
@@ -384,9 +387,10 @@ export function valueAccount(book, market, date, accountId = null) {
           if (lot.creditType === "margin") {
             const p = dec(lot.principal).mul(q).div(lot.initialQty);
             principal = principal.plus(p);
-            const interest=closingInterest(lot,q.toString(),due);
+            const interest=closingInterest(lot,q.toString(),interestDates.repayment);
             interestRaw=interestRaw.plus(interest.raw);interestCharged=interestCharged.plus(interest.charged);
-            lot.repayments.push({ date: due, principal: p.toString(), interestRaw: interest.raw });
+            interestParts.push({lotId:lot.id,principal:p.toString(),annualRate:lot.annualRate,basis:lot.ruleSnapshot?.interestBasis??365,from:interest.from,through:interest.through,days:interest.days,provisional:interestDates.provisional||lot.interestPolicyProvisional,openingInterest:dec(lot.accruedInterest??0).mul(q).div(lot.initialQty).toString(),estimated:interest.charged});
+            lot.repayments.push({ date: due, interestDate:interestDates.repayment, principal: p.toString(), interestRaw: interest.raw });
           }
           if (lot.creditType === "short") {
             lot.shortRepayments ??= [];
@@ -404,7 +408,7 @@ export function valueAccount(book, market, date, accountId = null) {
         }
         t.principalRepaid = principal.toString();
         if(t.creditType === "margin"){
-          t.creditInterestRaw=interestRaw.toString();
+          t.creditInterestRaw=interestRaw.toString();t.creditInterestEstimate=interestCharged.toString();t.creditInterestParts=interestParts;
           const actual=t.actualCreditInterest;
           t.creditInterest=actual!=null&&actual!==""?dec(actual).toString():interestCharged.toString();
           if(dec(t.creditInterest).lt(0))throw Error("融資利息不可為負");
@@ -453,11 +457,13 @@ export function valueAccount(book, market, date, accountId = null) {
               ? t.financedPrincipal
               : "0",
           annualRate: t.ruleSnapshot.annualRate,
-          interestStart: due,
+          interestStart: t.creditType==="margin"?interestDates.start:due,
+          financedDate:due,
+          interestPolicyProvisional:t.creditType==="margin"&&interestDates.provisional,
           repayments: [],
         });
       const detail=prep.details.find(d=>d.id===(t.sourceTradeId??t.id));
-      if(detail && t.creditType === "margin")Object.assign(detail,{financedPrincipal:t.financedPrincipal,principalRepaid:t.principalRepaid,creditInterest:t.creditInterest,creditInterestEstimated:t.creditInterestEstimated});
+      if(detail && t.creditType === "margin")Object.assign(detail,{financedPrincipal:t.financedPrincipal,principalRepaid:t.principalRepaid,creditInterest:t.creditInterest,creditInterestEstimated:t.creditInterestEstimated,creditInterestEstimate:t.creditInterestEstimate,creditInterestParts:t.creditInterestParts});
       const posted = unwrap(
         postTrade(
           t,
@@ -672,7 +678,7 @@ export function valueAccount(book, market, date, accountId = null) {
     let settledMarginValue = dec(0),
       settledShortValue = dec(0);
     for (const l of lots) {
-      if (l.interestStart > date) continue;
+      if ((l.financedDate ?? l.interestStart) > date) continue;
       const price = latestPrice(market, l.code, date);
       if (!price) continue;
       if (l.creditType === "margin") {

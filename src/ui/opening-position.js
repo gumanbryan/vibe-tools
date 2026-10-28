@@ -14,7 +14,7 @@ export function estimatedOpeningPrincipal(price,qty,ratio) {
 export function wireOpeningPosition(form,accounts,validate,{openingDate,calendar,original}={}) {
   const el=form.elements, recalculate=form.querySelector('#opening-recalculate'), status=form.querySelector('#opening-principal-status');
   let manual=!!original,manualStart=!!original,manualInterest=!!original&&(original.interestMode??'manual')==='manual';
-  const interestButton=form.querySelector('#opening-interest-recalculate'),interestStatus=form.querySelector('#opening-interest-status');
+  const interestButton=form.querySelector('#opening-interest-recalculate'),interestStatus=form.querySelector('#opening-interest-status'),startButton=form.querySelector('#opening-start-recalculate');
   function defaults(){
     const p=accounts.find(a=>a.id===el.accountId.value)?.profile ?? DEFAULT_PROFILE;
     el.marginRatio.value=dec(p.marginRatio || DEFAULT_PROFILE.marginRatio).mul(100).toString();
@@ -35,7 +35,7 @@ export function wireOpeningPosition(form,accounts,validate,{openingDate,calendar
     for(const key of ['marginRatio','principal','annualRate','interestStart'])visible(key,margin);
     visible('restricted',short);visible('accruedInterest',margin||short);
     recalculate.hidden=!margin;status.hidden=!margin;
-    interestButton.hidden=!margin;interestStatus.hidden=!margin;
+    interestButton.hidden=!margin;interestStatus.hidden=!margin;if(startButton)startButton.hidden=!margin;
     if(margin && !manual)el.principal.value=estimatedOpeningPrincipal(el.price.value,el.qty.value,el.marginRatio.value);
     if(margin){
       if(!manualStart){const due=addBusinessDays(el.acquiredDate.value,2,calendar);el.interestStart.value=due.ok?due.value:'';}
@@ -50,12 +50,14 @@ export function wireOpeningPosition(form,accounts,validate,{openingDate,calendar
         interestStatus.textContent='請填完整本金、利率與計息起日。買進日不在交易日曆內時，請手動填券商計息起日，不需下載更早的股價資料。';
       }
     }
+    if(margin){const due=addBusinessDays(el.acquiredDate.value,2,calendar);if(due.ok&&el.interestStart.value&&el.interestStart.value<due.value)interestStatus.textContent+=' 目前起息日早於買進T+2（'+due.value+'），請核對券商紀錄；可按「依買進日重算起息日」校正。';}
     status.textContent=manual?'本金已手動修改，後續變更成本、股數或成數會保留此金額；需要重新估算可按「依成數重算本金」。':'自動估算：平均成本 × 股數 × 融資成數，未滿千元捨去。已還款者請直接改填券商目前的未償本金。';
   }
   if(!original)defaults();update();validate();
   // Capture runs before the shared validation listener, so checks see new values.
   form.addEventListener('input',update,true);
   form.addEventListener('change',update,true);
+  startButton?.addEventListener('click',()=>{manualStart=false;update();validate();});
   interestButton.addEventListener('click',()=>{manualInterest=false;update();validate();});
   recalculate.addEventListener('click',()=>{manual=false;update();validate();});
 }

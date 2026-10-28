@@ -12,6 +12,8 @@ import {
 const credit = { cash: "現股", margin: "融資", short: "融券" };
 export function positions(v) {
   const rows = v.latest?.positions ?? [];
+  const otherOpening = v.book.openingPositions.filter(p =>
+    (v.account === "all" || p.accountId === v.account) && !rows.some(row=>row.id===p.id));
   return `<div class="section-actions"><p class="muted">依成交日更新部位，交割款另行追蹤。</p><div>${button("opening-assets", "設定起始資產")}${button("opening-position", "新增起始部位")}${button("trade", "新增交易", "primary")}</div></div>${card(
     "目前持倉",
     table(
@@ -38,6 +40,16 @@ export function positions(v) {
     ),
     badge(rows.length + " 個批次"),
   )}
+ ${otherOpening.length ? card("其他起始部位（含已結清）",
+   note("已結清的起始部位仍可校正買進日與融資起息日，儲存後會重新計算歷史利息及交割款。") + table(
+     ["股票", "類型", "起始股數", "原始買進日", "未償融資本金", "融資計息起日", "操作"],
+     otherOpening.map(p=>[
+       `<strong>${E(p.code)} ${E(v.securityName(p.code))}</strong>`,
+       badge(credit[p.creditType]??p.creditType),num(p.qty),E(p.acquiredDate??"待核對"),
+       p.creditType==="margin"?num(p.principal):"—",
+       p.creditType==="margin"?E(p.interestStart??"尚未設定"):"—",
+       button("edit-opening","編輯起始持股","ghost",`data-id="${E(p.id)}"`)
+     ]))) : ""}
  ${card(
    "交易紀錄",
    table(
@@ -73,11 +85,11 @@ export function positions(v) {
            num(d?.rebate, 2),
            num(d?.tax),
            t.creditType === "margin" ? num(t.side === "buy" ? d?.financedPrincipal : d?.principalRepaid) : "—",
-           t.creditType === "margin" && t.side === "sell" ? num(d?.creditInterest)+`<small class="block">${d?.creditInterestEstimated?"預估，可依帳單校正":"依券商實填"}</small>` : "—",
+           t.creditType === "margin" && t.side === "sell" ? num(d?.creditInterest)+`<small class="block">${d?.creditInterestEstimated?"預估，可依帳單校正":"依券商實填"}</small>`+button("interest-review","計息明細","ghost",`data-id="${E(t.id)}"`) : "—",
            button("edit-trade", "修訂", "ghost", `data-id="${E(t.id)}"`) + button("delete-trade", "刪除", "ghost", `data-id="${E(t.id)}"`),
          ];
        }),
    ),
-   button("trade", "新增交易", "secondary"),
+   `<div>${button("interest-policy", "本次颱風計息規則", "secondary")}${button("interest-review", "核對融資利息", "secondary")}${button("trade", "新增交易", "secondary")}</div>`,
  )}${note("當沖必須指定類型並連結兩側成交。批次指定可在交易表單中設定，紀錄修訂會先顯示重算差異。")}`;
 }

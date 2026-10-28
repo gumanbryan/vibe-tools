@@ -1,3 +1,4 @@
+import {applyCalendarClosures} from '../../src/market/calendar-closures.js';
 import {isoDate} from './data-core.mjs';
 export function buildBusinessCalendar(observedDates,end,holidayRows){
  const holidayDates=[...new Set((holidayRows??[])
@@ -9,5 +10,5 @@ export function buildBusinessCalendar(observedDates,end,holidayRows){
   const date=d.toISOString().slice(0,10);
   if(d.getUTCDay()!==0&&d.getUTCDay()!==6&&!closed.has(date))future.push(date);
  }
- return {businessDates:[...new Set([...observedDates,...future])].filter(d=>!closed.has(d)).sort(),holidayDates,sourceVersion:'official-history-and-holiday-schedule',futureStatus:holidayRows?'holiday-filtered-estimate':'unverified-weekdays'};
+ return applyCalendarClosures({businessDates:[...new Set([...observedDates,...future])].filter(d=>!closed.has(d)).sort(),holidayDates,sourceVersion:'official-history-and-holiday-schedule',futureStatus:holidayRows?'holiday-filtered-estimate':'unverified-weekdays'});
 }
