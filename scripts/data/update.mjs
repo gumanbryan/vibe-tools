@@ -1,3 +1,5 @@
+import {fetchPublicJson} from './public-fetch.mjs';
+import {latestMarketDates} from '../../src/market/freshness.js';
 import {buildBusinessCalendar} from "./calendar.mjs";
 import {
   readFile,
@@ -14,6 +16,7 @@ import {
   normalizeIndexHistory,
   dataFilesToRemove,
   normalizeTpex,
+  normalizeTpexSnapshot,
   mergeDaily,
   isoDate,
   numberString,
@@ -32,9 +35,7 @@ async function json(url, cache) {
       return JSON.parse(await readFile(cache, "utf8"));
     } catch {}
   }
-  const r = await fetch(url, { signal: AbortSignal.timeout(30000) });
-  if (!r.ok) throw Error(`HTTP ${r.status}`);
-  const j = await r.json();
+  const j = await fetchPublicJson(url);
   if (cache) {
     await mkdir(".tmp/history", { recursive: true });
     await writeFile(cache, JSON.stringify(j));
@@ -52,7 +53,7 @@ function days(from, to) {
       out.push(d.toISOString().slice(0, 10));
   return out;
 }
-export async function updatePublicData({ end = today(), start = START } = {}) {
+export async function updatePublicData({ end = today(), start = START, requestJson = json } = {}) {
   if (start < START) throw Error("Cannot fetch before 2026-09-01");
   await mkdir("public/data", { recursive: true });
   let previousManifest = {};
@@ -93,12 +94,20 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
   } catch {}
   const updates = [],
     sourceStates = [];
+  // Query the small latest-day endpoint once, with the historical endpoint as fallback.
+  let latestTpex;
+  const latestUrl='https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes';
+  try{
+    latestTpex=normalizeTpexSnapshot(await requestJson(latestUrl),end);
+    sourceStates.push({sourceId:'tpex-mainboard-quotes',status:latestTpex.date===end?'available':'stale',date:latestTpex.date,rows:latestTpex.bars.length,url:latestUrl});
+  }catch(error){sourceStates.push({sourceId:'tpex-mainboard-quotes',status:'unavailable',reason:error.message,url:latestUrl});}
   const tasks = [];
+
   const existing = new Set(old.bars.map((b) => b.market + ":" + b.date));
   for (const date of days(start, end))
     for (const market of ["twse", "tpex"])
       if (!existing.has(market + ":" + date) || date >= days(start, end).at(-3))
-        tasks.push({ date, market });
+        if(!(market==="tpex"&&date===latestTpex?.date))tasks.push({ date, market });
   let cursor = 0;
   async function worker() {
     while (cursor < tasks.length) {
@@ -110,14 +119,14 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
           ? `https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=${compact}&type=ALLBUT0999&response=json`
           : `https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQuotes?date=${date.replaceAll("-", "/")}&id=&response=json`;
       try {
-        const raw = await json(url, `.tmp/history/${market}-${compact}.json`);
+        const raw = await requestJson(url, `.tmp/history/${market}-${compact}.json`);
         const normalized =
           market === "twse"
             ? normalizeTwse(raw, date)
             : normalizeTpex(raw, date);
         if (!normalized.empty && normalized.bars.length && market === "twse") {
           try {
-            const shares = await json(
+            const shares = await requestJson(
               `https://www.twse.com.tw/fund/MI_QFIIS?date=${compact}&selectType=ALLBUT0999&response=json`,
               `.tmp/history/shares-${compact}.json`,
             );
@@ -154,6 +163,8 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
     }
   }
   await Promise.all([worker(), worker()]);
+  // Latest-day snapshot takes priority; old dates still use the historical query.
+  if(latestTpex&&latestTpex.date>=start)updates.push(latestTpex);
   const out = mergeDaily(old, updates);
   const extra = [
     ["twse-companies", "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"],
@@ -168,7 +179,7 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
   ];
   for (const [id, url] of extra) {
     try {
-      const rows = await json(url);
+      const rows = await requestJson(url);
       sourceStates.push({
         sourceId: id,
         status: "available",
@@ -255,7 +266,7 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
     ...new Set(days(start, end).map((d) => d.slice(0, 7))),
   ]) {
     try {
-      const raw = await json(
+      const raw = await requestJson(
         `https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=${month.replace("-", "")}01&response=json`,
       );
       for (const r of raw.data ?? [])
@@ -276,7 +287,7 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
     ...new Set(days(start, end).map((d) => d.slice(0, 7))),
   ]) {
     try {
-      const raw = await json(
+      const raw = await requestJson(
         `https://www.tpex.org.tw/www/zh-tw/indexInfo/inx?date=${month.replace("-", "/")}%2F01&response=json`,
       );
       out.indexRows.push(...normalizeIndexHistory(raw, "TPEX", "櫃買指數"));
@@ -285,7 +296,7 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
     }
   }
   try {
-    const rows = await json("https://www.tpex.org.tw/openapi/v1/tpex_index");
+    const rows = await requestJson("https://www.tpex.org.tw/openapi/v1/tpex_index");
     for (const r of rows)
       out.indexRows.push({
         code: "TPEX",
@@ -331,7 +342,11 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
   const tradingDates = [...new Set(out.bars.map((b) => b.date))].sort();
   out.asOf = tradingDates.at(-1) ?? null;
   out.calendar=buildBusinessCalendar(tradingDates,end,out.holidayRows);
+  out.marketAsOf=latestMarketDates(out.bars);
+  if(out.marketAsOf.twse!==out.marketAsOf.tpex)
+    out.warnings.push(`行情日期不一致：上市 ${out.marketAsOf.twse??'無資料'}；上櫃 ${out.marketAsOf.tpex??'無資料'}`);
   const manifest = {
+    marketAsOf: out.marketAsOf,
     schemaVersion: 1,
     startDate: START,
     generatedAt: new Date().toISOString(),
@@ -380,6 +395,10 @@ export async function updatePublicData({ end = today(), start = START } = {}) {
     calendar: await atomic("public/data/calendar.json", out.calendar),
   };
   await atomic("public/data/manifest.json", manifest);
+  if(out.warnings.length){
+    console.warn('::warning::Public market data is partial: '+out.warnings.join('; ').replaceAll('\n',' '));
+    if(process.env.GITHUB_STEP_SUMMARY)await writeFile(process.env.GITHUB_STEP_SUMMARY,`## 行情更新結果\n\n上市：${out.marketAsOf.twse??'無資料'}；上櫃：${out.marketAsOf.tpex??'無資料'}\n\n部分更新：${out.warnings.join('; ')}\n`,{flag:'a'});
+  }
   for (const file of dataFilesToRemove(
     await readdir("public/data"),
     manifest,

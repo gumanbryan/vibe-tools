@@ -2,7 +2,7 @@ export const START = "2026-09-01";
 export const numberString = (x) =>
   x == null ||
   String(x).trim() === "" ||
-  /^(--|---|除權|除息|NaN|N\/A)$/.test(String(x).trim())
+  /^(-+|除權|除息|NaN|N\/A)$/.test(String(x).trim())
     ? null
     : String(x).replaceAll(",", "").replace(/\s/g, "");
 export function isoDate(x) {
@@ -103,6 +103,30 @@ function parse(raw, date, market) {
 }
 export const normalizeTwse = (raw, date) => parse(raw, date, "twse");
 export const normalizeTpex = (raw, date) => parse(raw, date, "tpex");
+// Latest snapshot has its own ROC Date; never relabel a stale snapshot as today.
+export function normalizeTpexSnapshot(raw,end){
+ if(!Array.isArray(raw)||!raw.length)throw Error('TPEx snapshot is empty or invalid');
+ const dates=[...new Set(raw.map(r=>isoDate(String(r.Date??'').trim())))];
+ const date=dates[0];
+ if(dates.length!==1||!date||date<START||date>end||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date)throw Error('TPEx snapshot date invalid');
+ const numeric=(v,{optional=false}={})=>{
+  const n=numberString(v);
+  if(n===null&&optional)return null;
+  if(n===null||!/^\d+(\.\d+)?$/.test(n))throw Error('TPEx snapshot number invalid');
+  return n;
+ };
+ const rows=raw.filter(r=>allowed(String(r.SecuritiesCompanyCode??'').trim()));
+ if(!rows.length)throw Error('TPEx snapshot contains no supported securities');
+ const seen=new Set();
+ const data=rows.map(r=>{
+  const code=String(r.SecuritiesCompanyCode).trim();if(seen.has(code))throw Error('Duplicate TPEx security');seen.add(code);
+  const close=numeric(r.Close,{optional:true});if(close!==null&&Number(close)<=0)throw Error('Invalid TPEx close');
+  return [code,String(r.CompanyName??'').trim(),close,numeric(r.Open,{optional:true}),numeric(r.High,{optional:true}),numeric(r.Low,{optional:true}),numeric(r.TradingShares),numeric(r.TransactionAmount)];
+ });
+ const result=normalizeTpex({date:date.replaceAll('-',''),tables:[{fields:['代號','名稱','收盤','開盤','最高','最低','成交股數','成交金額(元)'],data}]},date);
+ result.bars=result.bars.map(bar=>({...bar,sourceId:'tpex-mainboard-quotes'}));
+ return result;
+}
 export function mergeDaily(previous, updates) {
   const out = structuredClone(previous);
   out.bars ??= [];
@@ -124,8 +148,9 @@ export function mergeDaily(previous, updates) {
     for (const s of u.securities ?? [])
       securities.set(s.code, { ...securities.get(s.code), ...s });
     out.securities = [...securities.values()];
+    const capKeys = new Set((u.caps ?? []).map(x => x.code + ":" + x.date));
     out.caps = out.caps
-      .filter((x) => !barKeys.has(x.code + ":" + x.date))
+      .filter((x) => !capKeys.has(x.code + ":" + x.date))
       .concat(u.caps ?? []);
     out.indexRows.push(...(u.indices ?? []));
   }

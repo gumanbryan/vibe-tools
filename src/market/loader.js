@@ -1,3 +1,4 @@
+import {latestMarketDates} from './freshness.js';
 import {applyCalendarClosures} from "./calendar-closures.js";
 export async function verifyIntegrity(text, expected) {
   const bytes = await crypto.subtle.digest(
@@ -45,6 +46,7 @@ export async function loadMarket(base = "./") {
       ),
     ),
   );
+  market.marketAsOf=latestMarketDates(market.bars);
   market.calendar=applyCalendarClosures(market.calendar);
   const rows = await get(
     manifest.meta?.indices?.path ?? "data/index-rows.json",
