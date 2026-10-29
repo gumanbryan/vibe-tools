@@ -99,12 +99,14 @@ export function prepareTrades(book, date) {
         first.ruleSnapshot ??
         book.accounts.find((a) => a.id === first.accountId)?.profile ??
         DEFAULT_PROFILE;
+    const overrides=[...new Set(items.filter(t=>t.actualGrossFee!=null&&t.actualGrossFee!=='').map(t=>dec(t.actualGrossFee).toString()))];
+    if(overrides.length>1)throw Error('同一委託群組有不同實收手續費，請只填整張委託的同一金額');
     const fee = unwrap(
       calculateFee({
         gross: total.toString(),
         marketType: first.marketType,
         profile,
-        actualGrossFee: first.actualGrossFee,
+        actualGrossFee: overrides[0],
       }),
     );
     for (const t of items) {
@@ -125,7 +127,7 @@ export function prepareTrades(book, date) {
       };
       if (t.bondTaxExempt !== undefined)
         security = { ...security, bondTaxExempt: t.bondTaxExempt };
-      const tax =
+      const taxResult =
         t.side === "sell"
           ? unwrap(
               calculateTax({
@@ -137,8 +139,9 @@ export function prepareTrades(book, date) {
                   : null,
                 profile,
               }),
-            ).tax
-          : "0";
+            )
+          : {tax:"0",rawTax:"0"};
+      const tax=taxResult.tax;
       details.set(t.id, {
         ...t,
         ruleSnapshot: profile,
@@ -146,7 +149,21 @@ export function prepareTrades(book, date) {
         grossFee: dec(fee.grossFee).mul(ratio).toString(),
         rebate: dec(fee.rebate).mul(ratio).toString(),
         tax,
+        taxRaw:taxResult.rawTax,
       });
+    }
+  }
+  // New quick tickets identify the actual order and price; legacy rows stay unchanged.
+  const taxGroups=new Map();
+  for(const t of details.values())if(t.side==='sell'&&t.taxGroupId){
+    const key=JSON.stringify([t.accountId,t.date,t.code,t.creditType,t.marketType,t.taxGroupId,t.price,t.productType,t.bondTaxExempt]);
+    taxGroups.set(key,[...(taxGroups.get(key)??[]),t]);
+  }
+  for(const items of taxGroups.values()){
+    const total=sum(items.map(t=>t.taxRaw)).floor();
+    let remainder=total.minus(sum(items.map(t=>dec(t.taxRaw).floor())));
+    for(const t of [...items].sort((a,b)=>dec(b.taxRaw).mod(1).cmp(dec(a.taxRaw).mod(1)))){
+      const extra=remainder.gt(0)?1:0;t.tax=dec(t.taxRaw).floor().plus(extra).toString();remainder=remainder.minus(extra);
     }
   }
   const effective = [];

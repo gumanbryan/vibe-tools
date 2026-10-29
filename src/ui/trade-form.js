@@ -1,10 +1,13 @@
+import {dayBuyCandidates} from '../ledger/daytrade-ticket.js';
+import {E} from './helpers.js';
 import {dec} from '../domain/money.js';
 import {DEFAULT_PROFILE} from '../ledger/fees.js';
 
 // Disable irrelevant inputs as well as hiding them: they must not block validation
 // or leak old overrides into the transaction after changing its type.
-export function wireTradeForm(form,{accounts,securities},validate){
+export function wireTradeForm(form,{accounts,securities,book,original},validate){
  const el=form.elements;
+ const feeExplanation=form.querySelector("[data-fee-description]")?.innerHTML;
  form.classList.add('trade-form');
  const initial=el.dayType.value==='cash-day'&&el.creditType.value==='cash'?'cash-day':!el.dayType.value&&['cash','margin'].includes(el.creditType.value)?`${el.creditType.value}-${el.side.value}`:'other';
  el.tradePreset.value=initial;
@@ -35,9 +38,23 @@ export function wireTradeForm(form,{accounts,securities},validate){
   visible("actualPrincipal",margin&&el.side.value==="buy");
   visible("actualCreditInterest",margin&&el.side.value==="sell");
   for(const key of ['marginRatio','annualRate'])visible(key,margin,true);
-  visible('pairedTradeId',day);visible('dayQty',day);
+  const cashDay=el.dayType.value==='cash-day';
+  const quick=form.querySelector('[data-quick-day-button]');if(quick)quick.hidden=!cashDay;
+  const showPair=day&&(!cashDay||el.side.value==='sell');
+  const previous=el.pairedTradeId.value;
+  if(showPair&&cashDay&&book){
+   const paired=original&&book.allocations.some(a=>a.kind==='cash-day'&&(a.openTradeId===original.id||a.closeTradeId===original.id));
+   const same=original&&original.accountId===el.accountId.value&&original.code===el.code.value.trim()&&original.date===el.date.value;
+   const options=[...(paired&&same?[['keep','保留原配對（修改費用不變更配對）']]:[]),['auto','自動配對：依買進順序'],...dayBuyCandidates(book,{accountId:el.accountId.value,date:el.date.value,code:el.code.value.trim(),excludeTradeId:original?.id}).map(t=>[t.id,`${t.price} 元 · 可配 ${t.availableQty} 股 · 買進批次 ${t.id.slice(-6)}`])];
+   el.pairedTradeId.innerHTML=options.map(([id,label])=>`<option value="${E(id)}">${E(label)}</option>`).join('');
+   el.pairedTradeId.value=options.some(o=>o[0]===previous)?previous:options[0][0];
+  }
+  visible('pairedTradeId',showPair);visible('dayQty',showPair&&!cashDay);
+  const manual=form.querySelector('[data-manual-close]');if(manual){manual.hidden=day;manual.querySelectorAll('input').forEach(input=>input.disabled=day);}
+  const explanation=form.querySelector('[data-fee-description]');if(explanation&&cashDay)explanation.textContent='同一張委託拆成多筆成交才使用相同群組；不同委託請分開。實收手續費是整張委託的總額。多價位可直接使用「多價位快速當沖」。';
+  if(explanation&&!cashDay)explanation.innerHTML=feeExplanation;
   form.querySelector('[data-day-trade-help]').hidden=!day;
-  if(!day){el.pairedTradeId.value='';el.dayQty.value='';}
+  if(!showPair){el.pairedTradeId.value='';el.dayQty.value='';}
   const sec=securities.find(s=>s.code===el.code.value.trim());
   visible('bondTaxExempt',sec?.productType==='bond-etf'&&el.side.value==='sell');
  }

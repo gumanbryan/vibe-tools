@@ -87,7 +87,7 @@ export function calculateTax({ gross, security, date, allocation, profile }) {
       rate = dec("0.001");
       id = "etf";
     } else return err("TAX_PRODUCT_UNKNOWN", "請先確認商品類型");
-    return ok({ tax: g.mul(rate).floor().toString(), ruleId: id });
+    return ok({ tax: g.mul(rate).floor().toString(), rawTax: g.mul(rate).toString(), ruleId: id });
   } catch (e) {
     return err("TAX_INVALID", e.message);
   }

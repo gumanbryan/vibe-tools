@@ -14,7 +14,7 @@ export function positions(v) {
   const rows = v.latest?.positions ?? [];
   const otherOpening = v.book.openingPositions.filter(p =>
     (v.account === "all" || p.accountId === v.account) && !rows.some(row=>row.id===p.id));
-  return `<div class="section-actions"><p class="muted">依成交日更新部位，交割款另行追蹤。</p><div>${button("opening-assets", "設定起始資產")}${button("opening-position", "新增起始部位")}${button("trade", "新增交易", "primary")}</div></div>${card(
+  return `<div class="section-actions"><p class="muted">依成交日更新部位，交割款另行追蹤。</p><div>${button("opening-assets", "設定起始資產")}${button("opening-position", "新增起始部位")}${button("day-ticket", "當沖快速輸入", "secondary")}${button("trade", "新增交易", "primary")}</div></div>${card(
     "目前持倉",
     table(
       [
@@ -76,7 +76,7 @@ export function positions(v) {
            E(t.date),
            `<strong>${E(t.code)}</strong> ${E(v.securityName(t.code))}`,
            E(
-             t.dayType ||
+             (t.dayType==='cash-day'?`現股當沖${t.side==='buy'?'買進':'賣出'}`:t.dayType) ||
                `${credit[t.creditType]}${t.side === "buy" ? "買進" : "賣出"}`,
            ),
            num(t.qty),
@@ -90,6 +90,6 @@ export function positions(v) {
          ];
        }),
    ),
-   `<div>${button("interest-policy", "本次颱風計息規則", "secondary")}${button("interest-review", "核對融資利息", "secondary")}${button("trade", "新增交易", "secondary")}</div>`,
+   `<div>${button("day-repair", "檢查當沖配對", "secondary")}${button("interest-policy", "本次颱風計息規則", "secondary")}${button("interest-review", "核對融資利息", "secondary")}${button("trade", "新增交易", "secondary")}</div>`,
  )}${note("當沖必須指定類型並連結兩側成交。批次指定可在交易表單中設定，紀錄修訂會先顯示重算差異。")}`;
 }

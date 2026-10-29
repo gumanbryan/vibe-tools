@@ -4,7 +4,7 @@ test('large trade form uses common presets while retaining special trades',async
  await personal(page);await page.getByRole('button',{name:'＋ 新增交易',exact:true}).click();await expect(page.locator('[name=tradePreset]')).toBeVisible();
  await page.locator('[name=tradePreset]').selectOption('margin-buy');await expect(page.locator('[name=marginRatio]')).toBeVisible();await expect(page.locator('[name=side]')).not.toBeVisible();
  await page.locator('[name=tradePreset]').selectOption('cash-buy');await expect(page.locator('[name=annualRate]')).not.toBeVisible();
- await page.locator('[name=tradePreset]').selectOption('cash-day');await expect(page.locator('[name=side]')).toBeVisible();await expect(page.locator('[name=pairedTradeId]')).toBeVisible();
+ await page.locator('[name=tradePreset]').selectOption('cash-day');await expect(page.locator('[name=side]')).toBeVisible();await expect(page.locator('[name=pairedTradeId]')).toBeHidden();await page.locator('[name=side]').selectOption('sell');await expect(page.locator('[name=pairedTradeId]')).toBeVisible();
  await page.locator('[name=tradePreset]').selectOption('other');await expect(page.locator('[name=creditType]')).toBeVisible();await expect(page.locator('[name=dayType]')).toBeVisible();
  expect(await page.locator('[name=price]').evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
 });

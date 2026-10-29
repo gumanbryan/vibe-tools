@@ -1,10 +1,10 @@
 // Shared by every modal: prevent incomplete values from reaching accounting.
 export function wireValidation(form, extraCheck = () => {}) {
-  const inputs = [...form.querySelectorAll('input,select,textarea')];
   const submit = form.querySelector('[type=submit]');
   const errorBox = form.querySelector('#form-error');
   const labelOf = el => el.closest('label')?.querySelector('span')?.textContent || el.name;
   const validate = () => {
+    const inputs = [...form.querySelectorAll('input,select,textarea')];
     for (const el of inputs) el.setCustomValidity('');
     extraCheck(form);
     let first = '';

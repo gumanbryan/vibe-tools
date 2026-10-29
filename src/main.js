@@ -1,3 +1,5 @@
+import {dayTicketFields,wireDayTicket} from './ui/daytrade-ticket.js';
+import {buildDayTicket,reviseTrade,matchDaySale} from './ledger/daytrade-ticket.js';
 import {marketStatusText} from './market/freshness.js';
 import {applyBrokerInterest,applyInterestPolicy} from "./credit/financing.js";
 import {settlementSchedule,settlementSummary} from "./ledger/settlements.js";
@@ -270,7 +272,7 @@ function makeView() {
 }
 function shell(content, page, title) {
   const hasBook = !!state.book;
-  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.15</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>${E(marketStatusText(state.market))}</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
+  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.16</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>${E(marketStatusText(state.market))}</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
 }
 function render() {
   try {
@@ -470,8 +472,8 @@ function tradeForm(original) {
       [
         ["", "非當沖／留倉"],
         ["cash-day", "現股當沖－先買後賣"],
-        ["cash-first", "現股當沖－先賣後買"],
-        ["credit-day", "資券當沖－融資買進／融券賣出"],
+        ...(t.dayType==="cash-first"?[["cash-first", "舊紀錄：現股先賣後買"]]:[]),
+        ...(t.dayType==="credit-day"?[["credit-day", "舊紀錄：資券當沖"]]:[]),
       ],
       t.dayType ?? "",
     )}${select("pairedTradeId", "當天對應的買／賣成交（當沖配對）", [["", "暫不配對／此筆為第一側"], ...existing.map((x) => [x.id, `${x.date} ${x.code} ${x.side} ${x.qty}股`])])}${field("dayQty", "當沖股數（配對時填）", "number", "", 'min="1" step="1"')}${field("discountTenths", "本筆手續費打幾折", "number", p.discountTenths, 'min="0" max="10" step="0.01" required')}${field("marginRatio", "本筆融資成數（%）", "number", Number((t.creditType === "margin" ? p : a.profile).marginRatio) * 100, 'min="0" max="100" required')}${field("annualRate", "本筆融資年利率（%）", "number", Number((t.creditType === "margin" ? p : a.profile).annualRate || DEFAULT_PROFILE.annualRate) * 100, 'min="0" step="0.001" required')}${select(
@@ -487,10 +489,10 @@ function tradeForm(original) {
         : t.bondTaxExempt === false
           ? "no"
           : "unknown",
-    )}</div><p class="note" data-day-trade-help>當沖需有同帳戶、同日、同股票的相反方向成交。第一筆先選「暫不配對」；輸入第二筆時，選第一筆成交並填當沖股數。只選當沖類型不會完成配對，配對後才計算對應稅費。</p><details id="trade-advanced-fees"><summary>進階費用設定</summary><div class="form-grid">${field("feeGroupId", "同委託計費群組（選填）", "text", t.feeGroupId ?? "")}${field("actualGrossFee", "原始實收手續費（留空自算）", "number", t.actualGrossFee ?? "", 'min="0" step="1"')}${field("actualPrincipal", "券商實際融資本金（資買選填）", "number", t.actualPrincipal ?? "", 'min="0" step="1"')}${field("actualCreditInterest", "券商實收融資利息（資賣選填）", "number", t.actualCreditInterest ?? "", 'min="0" step="1"')}</div>${note("同一張委託拆成多筆成交，且你分筆輸入時，才填相同群組名稱（例如order-1）合併計算手續費。不同委託請分開；一筆輸入整張成交結果可留空。原始實收手續費可填多張委託的實收合計。融資本金自動按成交額×成數、未滿千元捨去；不同委託合併輸入時，可直接填券商實際本金。資賣利息預估至還款交割日前一天、結算暫按四捨五入至元，已知帳單金額可覆寫。")}</details><details><summary>手動指定平倉批次（未填採先進先出）</summary>${v.latest.positions.map((l) => field("lot:" + l.id, `${l.code} · ${l.id.slice(0, 12)} · 可用${num(l.qty)}股`, "number", "", 'min="0" step="1"')).join("")}</details>${note("先選現買、現賣、資買、資賣或先買後賣當沖；其他方式在「其他／特殊交易」。手續費折數沿用帳戶設定。送出後先試算，確認套用才儲存。")}`,
+    )}</div><p class="note" data-day-trade-help>第一筆買進直接記錄；賣出只列當天同股票的現股買進價位，預設自動配對。修改手續費會保留原配對。</p><div class="button-row" data-quick-day-button>${button("day-ticket-from-form","多價位快速當沖","secondary")}</div><details id="trade-advanced-fees"><summary>進階費用設定</summary><div class="form-grid">${field("feeGroupId", "同委託計費群組（選填）", "text", t.feeGroupId ?? "")}${field("actualGrossFee", "原始實收手續費（留空自算）", "number", t.actualGrossFee ?? "", 'min="0" step="1"')}${field("actualPrincipal", "券商實際融資本金（資買選填）", "number", t.actualPrincipal ?? "", 'min="0" step="1"')}${field("actualCreditInterest", "券商實收融資利息（資賣選填）", "number", t.actualCreditInterest ?? "", 'min="0" step="1"')}</div><div data-fee-description>${note("同一張委託拆成多筆成交，且你分筆輸入時，才填相同群組名稱（例如order-1）合併計算手續費。不同委託請分開；一筆輸入整張成交結果可留空。原始實收手續費可填多張委託的實收合計。融資本金自動按成交額×成數、未滿千元捨去；不同委託合併輸入時，可直接填券商實際本金。資賣利息預估至還款交割日前一天、結算暫按四捨五入至元，已知帳單金額可覆寫。")}</div></details><details data-manual-close><summary>手動指定平倉批次（未填採先進先出）</summary>${v.latest.positions.map((l) => field("lot:" + l.id, `${l.code} · ${l.id.slice(0, 12)} · 可用${num(l.qty)}股`, "number", "", 'min="0" step="1"')).join("")}</details>${note("先選現買、現賣、資買、資賣或先買後賣當沖；其他方式在「其他／特殊交易」。手續費折數沿用帳戶設定。送出後先試算，確認套用才儲存。")}`,
     async (f) => {
-      const draft = structuredClone(state.book),
-        account = draft.accounts.find((a) => a.id === f.accountId);
+      let draft = structuredClone(state.book);
+      const account = draft.accounts.find((a) => a.id === f.accountId);
       const sec = state.market.securities.find((s) => s.code === f.code.trim());
       if (!sec) throw Error("查無商品，請核對代號或資料來源");
       if (f.marketType === "odd" && (f.creditType !== "cash" || f.dayType))
@@ -536,14 +538,13 @@ function tradeForm(original) {
           kind: "交易修訂前版本",
           details: JSON.stringify(original),
         });
-        draft.trades = draft.trades.filter((t) => t.id !== original.id);
-        draft.allocations = draft.allocations.filter(
-          (x) =>
-            x.closeTradeId !== original.id && x.openTradeId !== original.id,
-        );
-      }
-      draft.trades.push(tx);
-      if (f.pairedTradeId) {
+        const replaceDay=(f.pairedTradeId&&f.pairedTradeId!=='keep')||(original.dayType&&original.dayType!==tx.dayType);
+        const audit=draft.audit;
+        draft=reviseTrade(draft,tx,{replaceDay:!!replaceDay});draft.audit=audit;
+      }else draft.trades.push(tx);
+      if(f.pairedTradeId==='auto'||(f.dayType==='cash-day'&&f.pairedTradeId&&f.pairedTradeId!=='keep')){
+        draft.allocations.push(...matchDaySale(draft,tx,f.pairedTradeId));
+      }else if (f.pairedTradeId&&f.pairedTradeId!=='keep') {
         if (!f.dayType) throw Error("配對成交前請選擇當沖類型");
         const other = draft.trades.find((t) => t.id === f.pairedTradeId);
         const qty = dec(f.dayQty || f.qty).toString();
@@ -628,7 +629,35 @@ function tradeForm(original) {
         el.bondTaxExempt.setCustomValidity("請先確認債券ETF免稅資格");
     },
   );
-  wireTradeForm(form,{accounts:state.book.accounts,securities:state.market.securities},validate);
+  wireTradeForm(form,{accounts:state.book.accounts,securities:state.market.securities,book:state.book,original},validate);
+}
+function dayTicketForm(initial={}){
+  const batchId=newId();
+  initial={accountId:state.account==='all'?state.book.accounts[0].id:state.account,date:state.date,...initial};
+  let read;
+  const {form,validate}=dialog('當沖快速輸入',dayTicketFields(state.book,initial)+`<datalist id="ticket-securities">${state.market.securities.map(s=>`<option value="${E(s.code)}">${E(s.name)}</option>`).join('')}</datalist>`,async()=>{
+    const input=read();
+    if(input.date>taipeiToday())throw Error('交易日期不可晚於今天');
+    const security=state.market.securities.find(s=>s.code===input.code);if(!security)throw Error('查無商品，請核對代號');
+    if(security.productType==='bond-etf'&&security.bondTaxExempt===undefined)throw Error('債券ETF請先用一般交易表單確認免稅資格');
+    const draft=buildDayTicket(state.book,input,security,batchId);
+    const preview=result(valueAccount(draft,state.market,state.date));
+    const details=preview.tradeDetails.filter(t=>t.id.startsWith(batchId+':'));
+    const pairs=draft.allocations.filter(a=>a.closeTradeId.startsWith(batchId+':'));
+    const trade=id=>draft.trades.find(t=>t.id===id);
+    dialog('確認當沖試算',table(['方向','成交價','股數','委託分組','原始手續費','交易稅'],details.map(t=>[t.side==='buy'?'買進':'賣出',num(t.price,2),num(t.qty),E((t.feeGroupId??'').split(':').at(-1)),num(t.grossFee,2),num(t.tax)]))+table(['買進價位','賣出價位','配對股數'],pairs.map(a=>[num(trade(a.openTradeId)?.price,2),num(trade(a.closeTradeId)?.price,2),num(a.qty)]))+note(`本次原始手續費 ${num(sum(details.map(t=>t.grossFee)))} 元；交易稅 ${num(sum(details.map(t=>t.tax)))} 元。預覽以估值日期 ${state.date} 為準，買進未賣完的部分會保留持股。`),async()=>save(draft,'新增當沖快速成交',`${input.date} ${input.code} ${details.length} 筆`),'確認套用');
+  },'預覽當沖試算');
+  read=wireDayTicket(form,state.book,batchId,validate);
+}
+function dayRepairForm(){
+  const draft=structuredClone(state.book),before=result(valueAccount(state.book,state.market,state.date)),changed=[],skipped=[];
+  for(const sale of [...draft.trades].filter(t=>t.side==='sell'&&t.creditType==='cash'&&t.dayType==='cash-day'&&t.date<=state.date).sort((a,b)=>a.date.localeCompare(b.date)||(a.sequence??0)-(b.sequence??0))){
+    if(draft.allocations.some(a=>a.kind==='cash-day'&&(a.openTradeId===sale.id||a.closeTradeId===sale.id)))continue;
+    try{draft.allocations.push(...matchDaySale(draft,sale));changed.push(sale);}catch(error){skipped.push(`${sale.date} ${sale.code}：${error.message}`);}
+  }
+  if(!changed.length){dialog('檢查當沖配對',note('沒有能自動恢復的缺失配對。')+skipped.map(note).join(''),async()=>{},'關閉');return;}
+  const after=result(valueAccount(draft,state.market,state.date));
+  dialog('預覽修復當沖配對',note('針對標記為現股當沖、但已失去配對的賣出，依同日買進順序重建。已有配對不改動，請核對後套用。')+table(['日期／股票','原交易稅','修復後交易稅'],changed.map(t=>[`${E(t.date)} ${E(t.code)}`,num(before.tradeDetails.find(d=>d.id===t.id)?.tax),num(after.tradeDetails.find(d=>d.id===t.id)?.tax)]))+skipped.map(note).join(''),async()=>commitRepair(draft,'修復當沖缺失配對',changed.map(t=>t.id).join(',')),'備份並套用');
 }
 function openingPositionForm(original) {
       const { form, validate } = dialog(
@@ -881,6 +910,12 @@ async function action(name, target) {
       render();
       break;
     }
+    case "day-ticket-from-form": {
+      const form=document.getElementById('modal-form');
+      dayTicketForm({accountId:form.elements.accountId.value,date:form.elements.date.value,code:form.elements.code.value});break;
+    }
+    case "day-ticket":dayTicketForm();break;
+    case "day-repair":dayRepairForm();break;
     case "trade":
       tradeForm();
       break;
