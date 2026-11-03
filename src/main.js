@@ -1,4 +1,6 @@
-import {strategy,strategyChoice,realizedDetail} from './ui/pages/strategy.js';
+import {resolveCashDayAllocations} from './ledger/day-pairs.js';
+import {strategyCampaigns} from './performance/strategy-campaigns.js';
+import {strategy,strategyChoice,realizedDetail,campaignDetail} from './ui/pages/strategy.js';
 import {dayTicketFields,wireDayTicket} from './ui/daytrade-ticket.js';
 import {buildDayTicket,reviseTrade,matchDaySale} from './ledger/daytrade-ticket.js';
 import {marketStatusText} from './market/freshness.js';
@@ -273,7 +275,7 @@ function makeView() {
 }
 function shell(content, page, title) {
   const hasBook = !!state.book;
-  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.17</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", strategy: "追蹤處置股策略的買賣與自備資金報酬。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>${E(marketStatusText(state.market))}</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
+  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.18</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", strategy: "追蹤處置股策略的買賣與自備資金報酬。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>${E(marketStatusText(state.market))}</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
 }
 function render() {
   try {
@@ -655,13 +657,12 @@ function dayTicketForm(initial={}){
 }
 function dayRepairForm(){
   const draft=structuredClone(state.book),before=result(valueAccount(state.book,state.market,state.date)),changed=[],skipped=[];
-  for(const sale of [...draft.trades].filter(t=>t.side==='sell'&&t.creditType==='cash'&&t.dayType==='cash-day'&&t.date<=state.date).sort((a,b)=>a.date.localeCompare(b.date)||(a.sequence??0)-(b.sequence??0))){
-    if(draft.allocations.some(a=>a.kind==='cash-day'&&(a.openTradeId===sale.id||a.closeTradeId===sale.id)))continue;
-    try{draft.allocations.push(...matchDaySale(draft,sale));changed.push(sale);}catch(error){skipped.push(`${sale.date} ${sale.code}：${error.message}`);}
-  }
+  const resolved=resolveCashDayAllocations(draft,state.date),added=resolved.filter(a=>!draft.allocations.some(old=>old.id===a.id&&old.qty===a.qty));
+  draft.allocations=resolved;
+  for(const id of new Set(added.map(a=>a.closeTradeId)))changed.push(draft.trades.find(t=>t.id===id));
   if(!changed.length){dialog('檢查當沖配對',note('沒有能自動恢復的缺失配對。')+skipped.map(note).join(''),async()=>{},'關閉');return;}
   const after=result(valueAccount(draft,state.market,state.date));
-  dialog('預覽修復當沖配對',note('針對標記為現股當沖、但已失去配對的賣出，依同日買進順序重建。已有配對不改動，請核對後套用。')+table(['日期／股票','原交易稅','修復後交易稅'],changed.map(t=>[`${E(t.date)} ${E(t.code)}`,num(before.tradeDetails.find(d=>d.id===t.id)?.tax),num(after.tradeDetails.find(d=>d.id===t.id)?.tax)]))+skipped.map(note).join(''),async()=>commitRepair(draft,'修復當沖缺失配對',changed.map(t=>t.id).join(',')),'備份並套用');
+  dialog('預覽修復當沖配對',note('計算已自動使用同日買進配對。此處可將補齊的配對寫入帳本；既有配對不改動。')+table(['日期／股票','原交易稅','修復後交易稅'],changed.map(t=>[`${E(t.date)} ${E(t.code)}`,num(before.tradeDetails.find(d=>d.id===t.id)?.tax),num(after.tradeDetails.find(d=>d.id===t.id)?.tax)]))+skipped.map(note).join(''),async()=>commitRepair(draft,'修復當沖缺失配對',changed.map(t=>t.id).join(',')),'備份並套用');
 }
 function openingPositionForm(original) {
       const { form, validate } = dialog(
@@ -798,6 +799,10 @@ async function action(name, target) {
       ? makeView()
       : null;
   switch (name) {
+    case "campaign-detail": {
+      const view=makeView(),cycle=strategyCampaigns(view.book,view.latest).cycles.find(c=>c.id===target.dataset.id);
+      if(cycle)dialog('策略單明細',campaignDetail(cycle,view.securityName),async()=>{},'關閉');break;
+    }
     case "realized-detail": {
       const view=makeView(),trade=view.latest.tradeDetails.find(t=>t.id===target.dataset.id);
       if(trade)dialog('已實現損益明細',realizedDetail(trade,view.securityName),async()=>{},'關閉');break;

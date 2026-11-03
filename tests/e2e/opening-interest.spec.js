@@ -19,7 +19,7 @@ test('editing a legacy holding preserves its existing interest start and manual 
 test('recalculate legacy financing start from purchase settlement without silently changing saved data',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'建立自己的帳本',exact:true}).click();await page.locator('[name=openingDate]').fill('2026-10-19');await page.getByRole('button',{name:'確認儲存',exact:true}).click();await expect(page.locator('#modal')).not.toBeVisible();
  await page.evaluate(async()=>{const {openBookStore}=await import('/src/storage/database.js');const s=await openBookStore('personal');const b=await s.load();b.openingPositions=[{id:'legacy',accountId:'default',code:'2313',creditType:'margin',qty:'1000',price:'243.5',principal:'146000',annualRate:'0.0645',acquiredDate:'2026-10-19',interestStart:'2026-10-19',accruedInterest:'0',interestMode:'estimate'}];b.trades=[{id:'sell',accountId:'default',code:'2313',creditType:'margin',side:'sell',date:'2026-10-21',qty:'1000',price:'249.5',ruleSnapshot:b.accounts[0].profile}];await s.save(b,b.revision);s.close();});
- await page.reload();await page.getByRole('link',{name:'持股與交易',exact:true}).click();await page.getByRole('button',{name:'編輯起始持股',exact:true}).click();
+ await page.reload();await page.getByRole('link',{name:'持股與交易',exact:true}).click();await page.locator('[data-action=realized-detail]').click();await page.getByRole('button',{name:'修改原始成本',exact:true}).click();
  await expect(page.locator('[name=interestStart]')).toHaveValue('2026-10-19');
  await page.getByRole('button',{name:'依買進日重算起息日',exact:true}).click({timeout:2500});
  await expect(page.locator('[name=interestStart]')).toHaveValue('2026-10-21');await expect(page.locator('[name=accruedInterest]')).toHaveValue('0');

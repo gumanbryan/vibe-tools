@@ -1,3 +1,4 @@
+import {resolveCashDayAllocations} from '../ledger/day-pairs.js';
 import {closePart,finalizeRealized} from './realized.js';
 import {financedPrincipal,closingInterest,marginInterestDates} from "../credit/financing.js";
 import { dec, D, sum } from "../domain/money.js";
@@ -63,6 +64,7 @@ function unwrap(r) {
   return r.value;
 }
 export function prepareTrades(book, date) {
+  book={...book,allocations:resolveCashDayAllocations(book,date)};
   unwrap(
     validateDayTrade(
       book.trades,
@@ -205,7 +207,7 @@ export function prepareTrades(book, date) {
       }
     } else effective.push(detail);
   }
-  return { details: [...details.values()], effective };
+  return { details: [...details.values()], effective, allocations:book.allocations };
 }
 export function valueAccount(book, market, date, accountId = null) {
   try {
@@ -379,7 +381,7 @@ export function valueAccount(book, market, date, accountId = null) {
             l.direction === (t.side === "buy" ? "short" : "long") &&
             dec(l.remainingQty).gt(0),
         );
-        const manual = book.allocations.filter(
+        const manual = prep.allocations.filter(
           (a) =>
             a.closeTradeId === t.id &&
             !["credit-day", "cash-first"].includes(a.kind),
@@ -438,12 +440,12 @@ export function valueAccount(book, market, date, accountId = null) {
         t.collateralReleased = released.toString();
         if (qty.gt(0)) {
           const isFirst =
-            book.allocations.some(
+            prep.allocations.some(
               (a) =>
                 (a.kind === "cash-first" || a.kind === "credit-day") &&
                 a.openTradeId === raw.sourceTradeId,
             ) ||
-            book.allocations.some(
+            prep.allocations.some(
               (a) => a.kind === "cash-first" && a.openTradeId === t.id,
             ) ||
             t.creditDay ||

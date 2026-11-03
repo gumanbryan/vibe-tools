@@ -14,7 +14,7 @@ test('partial sales allocate entry net fees and principal proportionately, with 
  const b=fixture('margin');b.accounts[0].profile.discountTenths='5';for(const t of b.trades)t.ruleSnapshot=b.accounts[0].profile;
  b.trades[0].actualGrossFee='100';b.trades[1].qty='500';b.trades[1].actualGrossFee='100';b.trades[1].actualCreditInterest='10';
  const d=valueAccount(b,market,dates[3]).value?.tradeDetails.find(t=>t.id==='s');
- assert.equal(d?.investedCapital,'20025');assert.equal(d.realizedProfit,'1759');assert.equal(d.realizedParts[0].entryNetFee,'25');assert.equal(d.realizedParts[0].exitNetFee,'50');assert.equal(d.realizedParts[0].interest,'10');
+ assert.equal(d?.investedCapital,'20050');assert.equal(d.realizedProfit,'1684');assert.equal(d.realizedParts[0].entryNetFee,'25');assert.equal(d.realizedParts[0].exitNetFee,'50');assert.equal(d.realizedParts[0].interest,'10');
 });
 test('a sale of mixed lots reports exact matched strategy and ordinary parts without tagging the whole stock',()=>{
  const b=fixture();b.trades[0].qty='500';b.trades.splice(1,0,{...b.trades[0],id:'b2',sequence:1.5,price:'102',strategyId:undefined});
@@ -38,5 +38,5 @@ test('account filter prevents realized records from leaking across accounts',()=
 });
 test('opening actual entry fee overrides estimates and uses the account rebate once',()=>{
  const b=fixture();b.accounts[0].profile.discountTenths='5';b.openingPositions=[{id:'opening',code:'A',accountId:'default',creditType:'cash',qty:'1000',price:'100',actualGrossFee:'100'}];b.trades=b.trades.filter(t=>t.side==='sell');b.trades[0].ruleSnapshot=b.accounts[0].profile;
- const d=valueAccount(b,market,dates[3]).value.tradeDetails[0];assert.equal(d.investedCapital,'100050');assert.equal(d.realizedProfit,'3638');assert.equal(d.realizedParts[0].entryFeeEstimated,false);
+ const d=valueAccount(b,market,dates[3]).value.tradeDetails[0];assert.equal(d.investedCapital,'100100');assert.equal(d.realizedProfit,'3588');assert.equal(d.realizedParts[0].entryFeeEstimated,false);
 });

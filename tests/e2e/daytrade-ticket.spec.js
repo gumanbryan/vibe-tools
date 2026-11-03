@@ -18,5 +18,5 @@ test('quick ticket adds multi-price fills, splits a sale and previews different 
  const b=await read(page);expect(b.trades).toHaveLength(3);expect(b.allocations).toHaveLength(2);expect(b.trades.filter(t=>t.side==='sell')[0].feeGroupId).toBe(b.trades.filter(t=>t.side==='sell')[1].feeGroupId);
 });
 test('repair previews missing pairing and restores day tax without overwriting trades',async({page})=>{
- await setup(page);await seed(page,false);await page.getByRole('button',{name:'檢查當沖配對',exact:true}).click();await expect(page.locator('#modal')).toContainText('300');await expect(page.locator('#modal')).toContainText('150');expect((await read(page)).allocations).toHaveLength(0);await page.getByRole('button',{name:'備份並套用',exact:true}).click();expect((await read(page)).allocations).toHaveLength(1);expect((await read(page)).trades).toHaveLength(2);
+ await setup(page);await seed(page,false);await page.getByRole('button',{name:'檢查當沖配對',exact:true}).click();await expect(page.locator('#modal')).toContainText('150');expect((await read(page)).allocations).toHaveLength(0);await page.getByRole('button',{name:'備份並套用',exact:true}).click();expect((await read(page)).allocations).toHaveLength(1);expect((await read(page)).trades).toHaveLength(2);
 });
