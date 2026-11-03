@@ -18,7 +18,7 @@ test("first visitor builds own book or loads independent demo, six pages work", 
     "持股與交易",
     "帳務與費用",
     "大盤與題材",
-    "事件中心",
+    "處置股策略",
     "設定與備份",
   ]) {
     await page.getByRole("link", { name, exact: true }).click();

@@ -1,3 +1,4 @@
+import {strategy,strategyChoice,realizedDetail} from './ui/pages/strategy.js';
 import {dayTicketFields,wireDayTicket} from './ui/daytrade-ticket.js';
 import {buildDayTicket,reviseTrade,matchDaySale} from './ledger/daytrade-ticket.js';
 import {marketStatusText} from './market/freshness.js';
@@ -95,7 +96,7 @@ const nav = [
   ["positions", "持股與交易"],
   ["accounting", "帳務與費用"],
   ["market", "大盤與題材"],
-  ["events", "事件中心"],
+  ["strategy", "處置股策略"],
   ["settings", "設定與備份"],
 ];
 const icon = (i) =>
@@ -272,7 +273,7 @@ function makeView() {
 }
 function shell(content, page, title) {
   const hasBook = !!state.book;
-  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.16</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>${E(marketStatusText(state.market))}</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
+  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.17</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", strategy: "追蹤處置股策略的買賣與自備資金報酬。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>${E(marketStatusText(state.market))}</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
 }
 function render() {
   try {
@@ -294,16 +295,18 @@ function render() {
       return;
     }
     const v = makeView();
-    const page = nav.some(([id]) => id === location.hash.slice(1))
+    const routes=[...nav,["events","事件中心"]];
+    const page = routes.some(([id]) => id === location.hash.slice(1))
         ? location.hash.slice(1)
         : "overview",
-      title = nav.find((x) => x[0] === page)[1];
+      title = routes.find((x) => x[0] === page)[1];
     const pages = {
       overview,
       positions,
       accounting,
       market: marketPage,
       events: eventsPage,
+      strategy,
       settings,
     };
     app.innerHTML = shell(
@@ -489,7 +492,7 @@ function tradeForm(original) {
         : t.bondTaxExempt === false
           ? "no"
           : "unknown",
-    )}</div><p class="note" data-day-trade-help>第一筆買進直接記錄；賣出只列當天同股票的現股買進價位，預設自動配對。修改手續費會保留原配對。</p><div class="button-row" data-quick-day-button>${button("day-ticket-from-form","多價位快速當沖","secondary")}</div><details id="trade-advanced-fees"><summary>進階費用設定</summary><div class="form-grid">${field("feeGroupId", "同委託計費群組（選填）", "text", t.feeGroupId ?? "")}${field("actualGrossFee", "原始實收手續費（留空自算）", "number", t.actualGrossFee ?? "", 'min="0" step="1"')}${field("actualPrincipal", "券商實際融資本金（資買選填）", "number", t.actualPrincipal ?? "", 'min="0" step="1"')}${field("actualCreditInterest", "券商實收融資利息（資賣選填）", "number", t.actualCreditInterest ?? "", 'min="0" step="1"')}</div><div data-fee-description>${note("同一張委託拆成多筆成交，且你分筆輸入時，才填相同群組名稱（例如order-1）合併計算手續費。不同委託請分開；一筆輸入整張成交結果可留空。原始實收手續費可填多張委託的實收合計。融資本金自動按成交額×成數、未滿千元捨去；不同委託合併輸入時，可直接填券商實際本金。資賣利息預估至還款交割日前一天、結算暫按四捨五入至元，已知帳單金額可覆寫。")}</div></details><details data-manual-close><summary>手動指定平倉批次（未填採先進先出）</summary>${v.latest.positions.map((l) => field("lot:" + l.id, `${l.code} · ${l.id.slice(0, 12)} · 可用${num(l.qty)}股`, "number", "", 'min="0" step="1"')).join("")}</details>${note("先選現買、現賣、資買、資賣或先買後賣當沖；其他方式在「其他／特殊交易」。手續費折數沿用帳戶設定。送出後先試算，確認套用才儲存。")}`,
+    )}</div>${strategyChoice(t.strategyId==="disposition")}<p class="note" data-day-trade-help>第一筆買進直接記錄；賣出只列當天同股票的現股買進價位，預設自動配對。修改手續費會保留原配對。</p><div class="button-row" data-quick-day-button>${button("day-ticket-from-form","多價位快速當沖","secondary")}</div><details id="trade-advanced-fees"><summary>進階費用設定</summary><div class="form-grid">${field("feeGroupId", "同委託計費群組（選填）", "text", t.feeGroupId ?? "")}${field("actualGrossFee", "原始實收手續費（留空自算）", "number", t.actualGrossFee ?? "", 'min="0" step="1"')}${field("actualPrincipal", "券商實際融資本金（資買選填）", "number", t.actualPrincipal ?? "", 'min="0" step="1"')}${field("actualCreditInterest", "券商實收融資利息（資賣選填）", "number", t.actualCreditInterest ?? "", 'min="0" step="1"')}</div><div data-fee-description>${note("同一張委託拆成多筆成交，且你分筆輸入時，才填相同群組名稱（例如order-1）合併計算手續費。不同委託請分開；一筆輸入整張成交結果可留空。原始實收手續費可填多張委託的實收合計。融資本金自動按成交額×成數、未滿千元捨去；不同委託合併輸入時，可直接填券商實際本金。資賣利息預估至還款交割日前一天、結算暫按四捨五入至元，已知帳單金額可覆寫。")}</div></details><details data-manual-close><summary>手動指定平倉批次（未填採先進先出）</summary>${v.latest.positions.map((l) => field("lot:" + l.id, `${l.code} · ${l.id.slice(0, 12)} · 可用${num(l.qty)}股`, "number", "", 'min="0" step="1"')).join("")}</details>${note("先選現買、現賣、資買、資賣或先買後賣當沖；其他方式在「其他／特殊交易」。手續費折數沿用帳戶設定。送出後先試算，確認套用才儲存。")}`,
     async (f) => {
       let draft = structuredClone(state.book);
       const account = draft.accounts.find((a) => a.id === f.accountId);
@@ -514,6 +517,7 @@ function tradeForm(original) {
         actualGrossFee: f.actualGrossFee,
         actualPrincipal: f.creditType === "margin" && f.side === "buy" ? f.actualPrincipal : undefined,
         actualCreditInterest: f.creditType === "margin" && f.side === "sell" ? f.actualCreditInterest : undefined,
+        strategyId:f.side==="buy"?(f.strategyDisposition==="yes"?"disposition":undefined):original?.strategyId,
         productType: sec.productType,
         bondTaxExempt:
           !f.bondTaxExempt || f.bondTaxExempt === "unknown" ? undefined : f.bondTaxExempt === "yes",
@@ -671,7 +675,7 @@ function openingPositionForm(original) {
             ["short", "融券"],
           ],
           original?.creditType??"cash",
-        )}${field("qty", "起始股數", "number", original?.qty??"1000", 'min="1" step="1" required')}${field("price", "平均成本／融券賣價", "number", original?.price??"", 'min="0.01" step="0.01" required')}${field("marginRatio", "融資成數（%，例如60代表六成）", "number", original?.marginRatio?Number(original.marginRatio)*100:"60", 'min="0.01" max="100" step="0.01" required')}${field("principal", "未償融資本金（自動估算，可修改）", "number", original?.principal??"0", 'min="0.01" step="any" required')}${field("annualRate", "融資年利率（%，預設6.45）", "number", Number(original?.annualRate??DEFAULT_PROFILE.annualRate)*100, 'min="0" step="0.001" required')}${field("restricted", "已繳融券擔保款＋保證金", "number", original?.restricted??"0", 'min="0" step="0.01" required')}${field("interestStart","融資計息起日（買進T+2，可校正）","date",original?.interestStart??(original?state.book.openingDate:""),"required")}${field("accruedInterest", "啟用前已累計未付利息（自動估算，可修改）", "number", original?.accruedInterest??"0", 'min="0" step="any" required')}</div><input type="hidden" name="interestMode"><div class="button-row"><button type="button" id="opening-recalculate" class="btn secondary">依成數重算本金</button><button type="button" id="opening-start-recalculate" class="btn secondary">依買進日重算起息日</button><button type="button" id="opening-interest-recalculate" class="btn secondary">依日期重估利息</button></div><p id="opening-principal-status" class="note"></p><p id="opening-interest-status" class="note"></p>${note("起始部位不再次扣現金；現金欄位應填投入這些部位後實際剩餘金額。融資成數用平均買進成本估算，不用目前股價。日期以帳本開始追蹤日為界，之後買進請新增交易；啟用前利息按本金、利率不變估算，若曾還款／調息，請填券商實際累計利息。")}`,
+        )}${field("qty", "起始股數", "number", original?.qty??"1000", 'min="1" step="1" required')}${field("price", "平均成本／融券賣價", "number", original?.price??"", 'min="0.01" step="0.01" required')}${field("marginRatio", "融資成數（%，例如60代表六成）", "number", original?.marginRatio?Number(original.marginRatio)*100:"60", 'min="0.01" max="100" step="0.01" required')}${field("principal", "未償融資本金（自動估算，可修改）", "number", original?.principal??"0", 'min="0.01" step="any" required')}${field("annualRate", "融資年利率（%，預設6.45）", "number", Number(original?.annualRate??DEFAULT_PROFILE.annualRate)*100, 'min="0" step="0.001" required')}${field("restricted", "已繳融券擔保款＋保證金", "number", original?.restricted??"0", 'min="0" step="0.01" required')}${field("interestStart","融資計息起日（買進T+2，可校正）","date",original?.interestStart??(original?state.book.openingDate:""),"required")}${field("accruedInterest", "啟用前已累計未付利息（自動估算，可修改）", "number", original?.accruedInterest??"0", 'min="0" step="any" required')}</div><input type="hidden" name="interestMode"><div class="button-row"><button type="button" id="opening-recalculate" class="btn secondary">依成數重算本金</button><button type="button" id="opening-start-recalculate" class="btn secondary">依買進日重算起息日</button><button type="button" id="opening-interest-recalculate" class="btn secondary">依日期重估利息</button></div><p id="opening-principal-status" class="note"></p><p id="opening-interest-status" class="note"></p>${field("actualGrossFee","原始買進實收手續費（選填，空白估算）","number",original?.actualGrossFee??"",'min="0" step="1"')}${strategyChoice(original?.strategyId==="disposition")}${note("起始部位不再次扣現金；現金欄位應填投入這些部位後實際剩餘金額。融資成數用平均買進成本估算，不用目前股價。日期以帳本開始追蹤日為界，之後買進請新增交易；啟用前利息按本金、利率不變估算，若曾還款／調息，請填券商實際累計利息。")}`,
         async (f) => {
           if (!state.market.securities.some((s) => s.code === f.code.trim()))
             throw Error("商品代號不存在");
@@ -679,6 +683,7 @@ function openingPositionForm(original) {
           const position={
             ...original,
             ...f,
+            strategyId:f.strategyDisposition==="yes"?"disposition":undefined,
             code: f.code.trim(),
             id: original?.id??newId(),
             date: b.openingDate,
@@ -793,6 +798,21 @@ async function action(name, target) {
       ? makeView()
       : null;
   switch (name) {
+    case "realized-detail": {
+      const view=makeView(),trade=view.latest.tradeDetails.find(t=>t.id===target.dataset.id);
+      if(trade)dialog('已實現損益明細',realizedDetail(trade,view.securityName),async()=>{},'關閉');break;
+    }
+    case "strategy-tags": {
+      const view=makeView(),liveIds=new Set(view.latest.positions.map(p=>p.id));
+      const records=[...state.book.openingPositions.filter(p=>p.creditType!=='short').map(p=>({...p,collection:'openingPositions'})),...state.book.trades.filter(t=>t.side==='buy'&&t.creditType!=='short'&&t.date<=state.date).map(t=>({...t,collection:'trades'}))].filter(t=>state.account==='all'||t.accountId===state.account);
+      const suggested=r=>r.strategyId==='disposition'||(liveIds.has(r.id)&&['東台','達航科技'].includes(view.securityName(r.code).trim()));
+      dialog('管理／補標策略紀錄',note('以買進批次標記，賣出自動承接。預先勾選既有策略紀錄及目前持有的東台、達航科技，請核對；尚未儲存。取消勾選可改回一般投資。')+table(['處置股策略','買進日','股票','原始股數','狀態'],records.map(r=>[`<input aria-label="策略 ${E(r.code)} ${E(r.id)}" type="checkbox" name="tag:${E(r.collection)}:${E(r.id)}" value="yes" ${suggested(r)?'checked':''}>`,E(r.acquiredDate??r.date),`${E(r.code)} ${E(view.securityName(r.code))}`,num(r.qty),liveIds.has(r.id)?'仍持有':'已結清'])),async f=>{
+        const draft=structuredClone(state.book),changes=[];
+        for(const r of records){const record=draft[r.collection].find(t=>t.id===r.id);const selected=f[`tag:${r.collection}:${r.id}`]==='yes';if(selected!==(r.strategyId==='disposition')){record.strategyId=selected?'disposition':undefined;changes.push(r);}}
+        if(!changes.length)return;
+        dialog('確認策略標記',table(['買進日','股票','新分類'],changes.map(r=>[E(r.acquiredDate??r.date),`${E(r.code)} ${E(view.securityName(r.code))}`,draft[r.collection].find(t=>t.id===r.id).strategyId==='disposition'?'處置股策略':'一般投資']))+note('只修改策略分類，買賣數量、費用與現金不變。既有對應賣出會重新歸類，原帳本會先備份。'),async()=>commitRepair(draft,'調整處置股策略標記',changes.map(r=>r.id).join(',')),'備份並套用');
+      },'預覽標記變更');break;
+    }
     case "equity-detail": {
       const v=makeView();dialog("淨資產核對明細",equityDetails(v.latest,v.securityName),async()=>{},"關閉");break;
     }

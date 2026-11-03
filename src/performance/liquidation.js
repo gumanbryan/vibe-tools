@@ -28,7 +28,7 @@ export function valueAccount(book,market,date,accountId=null){
     let entry;
     if(p.stockGrant)entry={grossFee:'0',rebate:'0'};
     else if(p.grossFee!=null)entry={grossFee:dec(p.grossFee).mul(ratio).toString(),rebate:dec(p.rebate??0).mul(ratio).toString()};
-    else {const f=unwrap(calculateFee({gross:dec(p.price).mul(p.initialQty??p.qty).toString(),marketType:p.marketType??(dec(p.initialQty??p.qty).lt(1000)?'odd':'regular'),profile:p.ruleSnapshot??profile}));entry={grossFee:dec(f.grossFee).mul(ratio).toString(),rebate:dec(f.rebate).mul(ratio).toString()};p.entryFeeEstimated=true;}
+    else {const f=unwrap(calculateFee({gross:dec(p.price).mul(p.initialQty??p.qty).toString(),marketType:p.marketType??(dec(p.initialQty??p.qty).lt(1000)?'odd':'regular'),profile:p.ruleSnapshot??profile,actualGrossFee:p.actualGrossFee}));entry={grossFee:dec(f.grossFee).mul(ratio).toString(),rebate:dec(f.rebate).mul(ratio).toString()};p.entryFeeEstimated=p.actualGrossFee==null||p.actualGrossFee==='';}
     p.entryFee=entry.grossFee;p.entryRebate=entry.rebate;
     p.entryTax=p.direction==='short'?(p.tax!=null?dec(p.tax).mul(ratio).toString():unwrap(calculateTax({gross:dec(p.price).mul(p.qty).toString(),security:market.securities.find(x=>x.code===p.code)??{},date:p.acquiredDate??p.date??date})).tax):'0';
     p.exitFee=fee.mul(weight).toString();p.exitTax=tax.mul(weight).toString();p.estimatedExitRebate=rebate.mul(weight).toString();

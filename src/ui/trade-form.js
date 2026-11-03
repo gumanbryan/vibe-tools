@@ -38,6 +38,7 @@ export function wireTradeForm(form,{accounts,securities,book,original},validate)
   visible("actualPrincipal",margin&&el.side.value==="buy");
   visible("actualCreditInterest",margin&&el.side.value==="sell");
   for(const key of ['marginRatio','annualRate'])visible(key,margin,true);
+  const strategy=form.querySelector('.strategy-choice');if(strategy){const show=el.side.value==='buy'&&el.creditType.value!=='short';strategy.hidden=!show;strategy.querySelector('input').disabled=!show;}
   const cashDay=el.dayType.value==='cash-day';
   const quick=form.querySelector('[data-quick-day-button]');if(quick)quick.hidden=!cashDay;
   const showPair=day&&(!cashDay||el.side.value==='sell');

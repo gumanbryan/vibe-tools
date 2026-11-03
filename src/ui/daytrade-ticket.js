@@ -1,8 +1,9 @@
+import {strategyChoice} from './pages/strategy.js';
 import {E,field,select,note,button,num} from './helpers.js';
 import {dayBuyCandidates} from '../ledger/daytrade-ticket.js';
 export function dayTicketFields(book,initial){
  return `<div class="form-grid">${select('accountId','帳戶',book.accounts.map(a=>[a.id,a.name]),initial.accountId)}${field('date','交易日期','date',initial.date,'required')}${field('code','股票代號','text',initial.code??'','required list="ticket-securities"')}</div>`+
- note('僅限現股先買後賣。已輸入過的買進不用再新增，可直接選取下方買進價位。相同委託號碼代表同一張委託，不同號碼代表分單。')+
+ strategyChoice(false)+note('僅限現股先買後賣。已輸入過的買進不用再新增，可直接選取下方買進價位。相同委託號碼代表同一張委託，不同號碼代表分單。')+
  '<div class="ticket-board">'+['buy','sell'].map(side=>`<section class="ticket-side"><h3>${side==='buy'?'買進成交':'賣出成交'}</h3><div class="button-row"><button type="button" class="btn secondary" data-ticket-action="add" data-side="${side}">＋ 一筆${side==='buy'?'買進':'賣出'}</button><button type="button" class="btn ghost" data-ticket-action="same" data-side="${side}">同一委託分批成交</button><button type="button" class="btn ghost" data-ticket-action="separate" data-side="${side}">各筆獨立委託</button>${side==='buy'?'<button type="button" class="btn ghost" data-ticket-action="existing">只用既有買進</button>':''}</div><div data-ticket-rows="${side}"></div></section>`).join('')+'</div>'+
  '<p class="note" data-ticket-total></p>'+note('同一委託共用一次最低手續費；同一委託、相同價位合併估算交易稅。各筆成交與配對仍分別保存。按預覽後才會顯示本次費用，不會立即寫入帳本。');
 }
@@ -42,5 +43,5 @@ export function wireDayTicket(form,book,batchId,validate){
  });
  form.addEventListener('input',updateOptions);form.addEventListener('change',updateOptions);
  render();
- return ()=>({...scope(),buys:collect('buy'),sells:collect('sell')});
+ return ()=>({...scope(),strategyDisposition:el.strategyDisposition.checked,buys:collect('buy'),sells:collect('sell')});
 }

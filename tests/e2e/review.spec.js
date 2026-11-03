@@ -134,7 +134,7 @@ test("R6 payment reminder only receives existing dividend and never adds entitle
   await expect(
     page.getByRole("heading", { name: "帳務待確認", exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "事件中心", exact: true }).click();
+  await page.goto("/#events");
   await page
     .locator("tr")
     .filter({ hasText: "股利待核對入帳" })

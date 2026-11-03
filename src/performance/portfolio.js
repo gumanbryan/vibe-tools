@@ -1,3 +1,4 @@
+import {closePart,finalizeRealized} from './realized.js';
 import {financedPrincipal,closingInterest,marginInterestDates} from "../credit/financing.js";
 import { dec, D, sum } from "../domain/money.js";
 import { ok, err } from "../domain/result.js";
@@ -354,6 +355,7 @@ export function valueAccount(book, market, date, accountId = null) {
       const interestPolicy=accounts.find(a=>a.id===t.accountId)?.creditInterestPolicy??"standard";
       const interestDates=marginInterestDates(t,due,interestPolicy,market.calendar);
       let qty = dec(t.qty);
+      const realizedParts=[];
       if(t.creditType === "margin" && t.side === "buy")t.financedPrincipal=financedPrincipal(dec(t.qty).mul(t.price).toString(),t.ruleSnapshot.marginRatio,t.actualPrincipal);
       const short = t.creditType === "short";
       const cashShort = lots.filter(
@@ -399,12 +401,14 @@ export function valueAccount(book, market, date, accountId = null) {
           const q = D.min(qty, target._limit ?? lot.remainingQty);
           if (q.gt(lot.remainingQty) || q.lte(0))
             throw Error("指定沖銷股數超過可用");
+          const realized=closePart(lot,t,q.toString());realizedParts.push(realized);
           lot.remainingQty = dec(lot.remainingQty).minus(q).toString();
           qty = qty.minus(q);
           if (lot.creditType === "margin") {
             const p = dec(lot.principal).mul(q).div(lot.initialQty);
             principal = principal.plus(p);
             const interest=closingInterest(lot,q.toString(),interestDates.repayment);
+            realized.interestEstimate=interest.charged;
             interestRaw=interestRaw.plus(interest.raw);interestCharged=interestCharged.plus(interest.charged);
             interestParts.push({lotId:lot.id,principal:p.toString(),annualRate:lot.annualRate,basis:lot.ruleSnapshot?.interestBasis??365,from:interest.from,through:interest.through,days:interest.days,provisional:interestDates.provisional||lot.interestPolicyProvisional,openingInterest:dec(lot.accruedInterest??0).mul(q).div(lot.initialQty).toString(),estimated:interest.charged});
             lot.repayments.push({ date: due, interestDate:interestDates.repayment, principal: p.toString(), interestRaw: interest.raw });
@@ -479,7 +483,9 @@ export function valueAccount(book, market, date, accountId = null) {
           interestPolicyProvisional:t.creditType==="margin"&&interestDates.provisional,
           repayments: [],
         });
+      const realized=finalizeRealized(realizedParts,t);
       const detail=prep.details.find(d=>d.id===(t.sourceTradeId??t.id));
+      if(detail&&realizedParts.length)Object.assign(detail,realized);
       if(detail && t.creditType === "margin")Object.assign(detail,{financedPrincipal:t.financedPrincipal,principalRepaid:t.principalRepaid,creditInterest:t.creditInterest,creditInterestEstimated:t.creditInterestEstimated,creditInterestEstimate:t.creditInterestEstimate,creditInterestParts:t.creditInterestParts});
       const posted = unwrap(
         postTrade(

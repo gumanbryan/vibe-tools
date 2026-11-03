@@ -59,6 +59,6 @@ export function overview(v) {
    }</div>`,
    '<a href="#market" class="text-link">全部題材 ↗</a>',
  )}
- <div class="stack">${card("帳務待確認", alerts.length ? alerts.map((x) => `<div class="reminder-row"><span class="reminder-dot"></span><div><strong>${E(x.title)}</strong><small>${E(x.code)} · ${E(x.date ?? "日期待公告")}</small></div></div>`).join("") : `<div class="calm-empty"><span>✓</span><div><strong>目前沒有待確認項目</strong><small>股利、退費與交割提醒會顯示在這裡</small></div></div>`, badge(String(alerts.length)))}${card("近期持股事件", marketEvents.length ? marketEvents.map((x) => `<div class="reminder-row"><div><strong>${E(x.title)}</strong><small>${E(x.code)} · ${E(x.date ?? "詳見公告")}</small></div></div>`).join("") : note("目前未取得近期法說會或股東會公告；不代表沒有事件。"), '<a href="#events" class="text-link">查看事件 ↗</a>')}</div></div>
+ <div class="stack">${card("帳務待確認", alerts.length ? alerts.map((x) => `<div class="reminder-row"><span class="reminder-dot"></span><div><strong>${E(x.title)}</strong><small>${E(x.code)} · ${E(x.date ?? "日期待公告")}</small></div></div>`).join("") : `<div class="calm-empty"><span>✓</span><div><strong>目前沒有待確認項目</strong><small>股利、退費與交割提醒會顯示在這裡</small></div></div>`, badge(String(alerts.length)))}</div></div>
  ${s?.warnings?.length ? `<details class="data-notes"><summary>計算狀態 · ${s.warnings.length} 項提醒</summary>${s.warnings.map((x) => `<p>${E(x)}</p>`).join("")}</details>` : ""}`;
 }

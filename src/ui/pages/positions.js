@@ -1,6 +1,7 @@
 import {
   E,
   num,
+  pct,
   signed,
   color,
   badge,
@@ -59,6 +60,9 @@ export function positions(v) {
        "交易類型",
        "股數",
        "成交價",
+       "已實現淨損益",
+       "自備資金報酬率",
+       "對應自備資金",
        "原始手續費",
        "待退折讓",
        "交易稅",
@@ -74,13 +78,16 @@ export function positions(v) {
          const d = v.latest?.tradeDetails?.find((x) => x.id === t.id);
          return [
            E(t.date),
-           `<strong>${E(t.code)}</strong> ${E(v.securityName(t.code))}`,
+           `<strong>${E(t.code)}</strong> ${E(v.securityName(t.code))}${t.strategyId==='disposition'?'<small class="block">處置股策略</small>':(d?.realizedParts??[]).some(p=>p.strategyId==='disposition')?'<small class="block">含策略部位</small>':''}`,
            E(
              (t.dayType==='cash-day'?`現股當沖${t.side==='buy'?'買進':'賣出'}`:t.dayType) ||
                `${credit[t.creditType]}${t.side === "buy" ? "買進" : "賣出"}`,
            ),
            num(t.qty),
            num(t.price, 2),
+           d?.realizedProfit!=null?`<button class="value-link ${color(d.realizedProfit)}" data-action="realized-detail" data-id="${E(t.id)}">${signed(d.realizedProfit,2)} ↗</button>${(d.realizedParts??[]).some(p=>p.entryFeeEstimated||p.interestEstimated)?'<small class="block">含預估費用</small>':''}`:'—',
+           d?.realizedProfit!=null?pct(d.realizedReturn):'—',
+           d?.realizedProfit!=null?num(d.investedCapital,2):'—',
            num(d?.grossFee, 2),
            num(d?.rebate, 2),
            num(d?.tax),

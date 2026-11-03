@@ -1204,3 +1204,7 @@ dialog:has(.day-ticket-form) { width:min(1120px,96vw); }
 .day-ticket-form .ticket-side .btn { padding:8px; min-height:32px; font-size:13px; }
 .day-ticket-form .ticket-side .button-row { gap:4px; margin:6px 0; }
 @media(max-width:800px) { .ticket-board { grid-template-columns:1fr; gap:0; } .day-ticket-form .form-body > .form-grid { grid-template-columns:1fr; } }
+
+.strategy-choice { display:flex; align-items:center; gap:10px; padding:14px 0; font-size:15px; color:#505a70; }
+.strategy-choice input { width:18px; height:18px; accent-color:#7c6ee6; }
+.strategy-choice[hidden] { display:none; }

@@ -15,8 +15,8 @@ export const num = (x, d = 0) =>
       });
 export const pct = (x) =>
   x == null ? "—" : (Number(x) >= 0 ? "+" : "") + num(Number(x) * 100, 2) + "%";
-export const signed = (x) =>
-  x == null ? "—" : (Number(x) > 0 ? "+" : "") + num(x);
+export const signed = (x, d = 0) =>
+  x == null ? "—" : (Number(x) > 0 ? "+" : "") + num(x, d);
 export const color = (x) =>
   Number(x) > 0 ? "up" : Number(x) < 0 ? "down" : "muted";
 export const badge = (s, kind = "neutral") =>

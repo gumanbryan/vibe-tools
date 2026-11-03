@@ -46,7 +46,7 @@ export function buildDayTicket(book,input,security,batchId){
   const qty=dec(row.qty),price=dec(row.price);
   if(!qty.isFinite()||!price.isFinite()||qty.lte(0)||!qty.isInteger()||price.lte(0))throw Error('股數須為正整數、價格須大於零');
   const order=String(row.order??i+1).trim();if(!order)throw Error('請填委託單號分組');
-  return {id:`${batchId}:${side}:${i}`,accountId:account.id,date:input.date,code:input.code,side,creditType:'cash',marketType:'regular',dayType:'cash-day',qty:qty.toString(),price:price.toString(),sequence:base+index++,productType:security.productType,bondTaxExempt:security.bondTaxExempt,ruleSnapshot:structuredClone(account.profile),feeGroupId:`${batchId}:${side}:${order}`,taxGroupId:`${batchId}:${side}:${order}:${price.toString()}`,actualGrossFee:row.actualGrossFee};
+  return {id:`${batchId}:${side}:${i}`,accountId:account.id,date:input.date,code:input.code,side,creditType:'cash',marketType:'regular',dayType:'cash-day',strategyId:side==='buy'&&input.strategyDisposition?'disposition':undefined,qty:qty.toString(),price:price.toString(),sequence:base+index++,productType:security.productType,bondTaxExempt:security.bondTaxExempt,ruleSnapshot:structuredClone(account.profile),feeGroupId:`${batchId}:${side}:${order}`,taxGroupId:`${batchId}:${side}:${order}:${price.toString()}`,actualGrossFee:row.actualGrossFee};
  };
  for(const [i,row] of (input.buys??[]).entries())draft.trades.push(make(row,'buy',i));
  for(const [i,row] of (input.sells??[]).entries()){
