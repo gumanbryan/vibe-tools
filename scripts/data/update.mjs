@@ -53,7 +53,7 @@ function days(from, to) {
       out.push(d.toISOString().slice(0, 10));
   return out;
 }
-export async function updatePublicData({ end = today(), start = START, requestJson = json } = {}) {
+export async function updatePublicData({ end = today(), start = START, requestJson = json, report = false } = {}) {
   if (start < START) throw Error("Cannot fetch before 2026-09-01");
   await mkdir("public/data", { recursive: true });
   let previousManifest = {};
@@ -395,9 +395,11 @@ export async function updatePublicData({ end = today(), start = START, requestJs
     calendar: await atomic("public/data/calendar.json", out.calendar),
   };
   await atomic("public/data/manifest.json", manifest);
-  if(out.warnings.length){
-    console.warn('::warning::Public market data is partial: '+out.warnings.join('; ').replaceAll('\n',' '));
-    if(process.env.GITHUB_STEP_SUMMARY)await writeFile(process.env.GITHUB_STEP_SUMMARY,`## 行情更新結果\n\n上市：${out.marketAsOf.twse??'無資料'}；上櫃：${out.marketAsOf.tpex??'無資料'}\n\n部分更新：${out.warnings.join('; ')}\n`,{flag:'a'});
+  // Only the real CLI refresh reports to Actions. Imported fixture runs during
+  // npm test must never append their simulated failures to the live job summary.
+  if(report){
+    if(out.warnings.length)console.warn('::warning::Public market data is partial: '+out.warnings.join('; ').replaceAll('\n',' '));
+    if(process.env.GITHUB_STEP_SUMMARY)await writeFile(process.env.GITHUB_STEP_SUMMARY,`## 行情更新結果\n\n資料產生時間（UTC）：${manifest.generatedAt}\n\n本次查詢截止日：${end}\n\n上市：${out.marketAsOf.twse??'無資料'}；上櫃：${out.marketAsOf.tpex??'無資料'}\n\n${out.warnings.length?'部分更新：'+out.warnings.join('; '):'更新完成，無資料警告。'}\n`,{flag:'a'});
   }
   for (const file of dataFilesToRemove(
     await readdir("public/data"),
@@ -417,4 +419,4 @@ export async function updatePublicData({ end = today(), start = START, requestJs
   return out;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
-  await updatePublicData();
+  await updatePublicData({report:true});
