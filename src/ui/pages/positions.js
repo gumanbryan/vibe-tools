@@ -10,35 +10,37 @@ import {
   card,
   note,
 } from "../helpers.js";
+import {groupPositions} from '../group-positions.js';
 const credit = { cash: "現股", margin: "融資", short: "融券" };
 export function positions(v) {
-  const rows = v.latest?.positions ?? [];
+  const rows = groupPositions(v.latest?.positions ?? []);
   return `<div class="section-actions"><p class="muted">依成交日更新部位，交割款另行追蹤。</p><div>${button("opening-assets", "設定起始資產")}${button("opening-position", "新增起始部位")}${button("day-ticket", "當沖快速輸入", "secondary")}${button("trade", "新增交易", "primary")}</div></div>${card(
     "目前持倉",
     table(
       [
-        "股票／批次",
+        "股票／帳戶",
         "類型",
         "持有股數",
-        "成本價",
+        "加權平均成本價",
         "估值價格",
         "市值",
         "扣費後未實現損益",
         "操作",
       ],
       rows.map((p) => [
-        `<strong>${E(p.code)} ${E(v.securityName(p.code))}</strong><small class="block">${E(p.id.slice(0, 12))} · ${E(p.accountId)}</small>`,
+        `<strong>${E(p.code)} ${E(v.securityName(p.code))}</strong><small class="block">${E(v.book.accounts.find(a=>a.id===p.accountId)?.name??p.accountId)} · ${p.members.length} 個批次</small>`,
         badge(credit[p.creditType] ?? p.creditType),
         num(p.qty),
         num(p.price, 2),
         `${num(p.marketPrice, 2)}<small class="block">${E(p.priceDate)}</small>`,
         num(p.marketValue),
         `<button type="button" class="value-link ${color(p.unrealized)}" data-action="position-detail" data-id="${E(p.id)}">${signed(p.unrealized)} ↗</button>`,
-        p.opening ? button("edit-opening","編輯起始持股","ghost",`data-id="${E(p.id)}"`)+button("delete-opening", "刪除起始持股", "ghost", `data-id="${E(p.id)}"`) : "請至交易紀錄操作",
+        p.members.length>1 ? button("position-detail","查看批次","ghost",`data-id="${E(p.id)}"`) : p.opening ? button("edit-opening","編輯起始持股","ghost",`data-id="${E(p.id)}"`)+button("delete-opening", "刪除起始持股", "ghost", `data-id="${E(p.id)}"`) : "請至交易紀錄操作",
       ]),
     ),
-    badge(rows.length + " 個批次"),
+    badge(rows.length + " 組持倉"),
   )}
+ ${note("同帳戶、同股票及同買進方式合併顯示；成本價按剩餘持股股數加權平均，不含手續費。原始批次與賣出配對保留，損益及費用沿用各批次計算後加總。")}
  ${card(
    "交易紀錄",
    table(
