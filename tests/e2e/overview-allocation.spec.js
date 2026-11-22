@@ -1,0 +1,10 @@
+import {test,expect} from '@playwright/test';
+test('allocation cash and manual prices revalue all lots and survive reload without changing trades',async({page})=>{
+ await page.goto('/');await page.getByRole('button',{name:'建立自己的帳本',exact:true}).click();await page.locator('[name=openingDate]').fill('2026-10-19');await page.locator('[name=cash]').fill('1000000');await page.getByRole('button',{name:'確認儲存',exact:true}).click();await expect(page.locator('#modal')).not.toBeVisible();
+ await page.evaluate(async()=>{const {openBookStore}=await import('/src/storage/database.js');const s=await openBookStore('personal'),b=await s.load();b.openingPositions=['a','b'].map(id=>({id,accountId:'default',code:'2313',creditType:'cash',qty:'1000',price:'100',date:b.openingDate}));await s.save(b,b.revision);s.close();});await page.reload();
+ await expect(page.getByRole('img',{name:'股票市值占比環圈圖'})).toBeVisible();await page.getByRole('button',{name:'手動估值價格',exact:true}).click();await page.locator('[name="quote:2313"]').fill('123.45');await page.getByRole('button',{name:'套用估值',exact:true}).click();await expect(page.locator('#modal')).not.toBeVisible();await expect(page.locator('[data-total-exposure]')).toHaveText('246,900');
+ await page.reload();await expect(page.locator('[data-total-exposure]')).toHaveText('246,900');await expect(page.locator('.manual-price-badge')).toHaveText('手動暫估');
+ for(const width of [1440,390]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+ await page.getByRole('button',{name:'手動估值價格',exact:true}).click();await page.getByRole('button',{name:'清除當日手動估值',exact:true}).click();await expect(page.locator('#modal')).not.toBeVisible();await expect(page.locator('.manual-price-badge')).toHaveCount(0);
+ const b=await page.evaluate(async()=>{const {openBookStore}=await import('/src/storage/database.js');const s=await openBookStore('personal');const b=await s.load();s.close();return b;});expect(b.trades).toEqual([]);expect(b.openingPositions.map(p=>p.price)).toEqual(['100','100']);
+});

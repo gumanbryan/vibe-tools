@@ -1,3 +1,4 @@
+import {applyManualPrices,activeManualPrices} from '../market/manual-prices.js';
 import {valueAccount as bookValue} from './portfolio.js';
 import {dec,sum} from '../domain/money.js';
 import {ok,err} from '../domain/result.js';
@@ -5,9 +6,12 @@ import {datesBetween} from '../domain/calendar.js';
 import {calculateFee,calculateTax,DEFAULT_PROFILE} from '../ledger/fees.js';
 const unwrap=r=>{if(!r.ok)throw Error(r.errors.map(x=>x.message).join('；'));return r.value;};
 export function valueAccount(book,market,date,accountId=null){
+ const officialMarket=market;market=applyManualPrices(book,market,date);
  const r=bookValue(book,market,date,accountId);if(!r.ok)return r;
  const s=r.value, warnings=[...s.warnings],groups=new Map();let missing=s.quality==='insufficient';
- const positions=s.positions.map(p=>({...p,grossUnrealized:p.unrealized}));
+ const manual=activeManualPrices(book,officialMarket,date).filter(q=>s.positions.some(p=>p.code===q.code));
+ if(manual.length)warnings.push('手動暫估價格：'+manual.map(q=>q.code).join('、')+'；尚非官方收盤價');
+ const positions=s.positions.map(p=>({...p,grossUnrealized:p.unrealized,manualPrice:manual.some(q=>q.code===p.code)}));
  for(const p of positions){const key=JSON.stringify([p.accountId,p.code,p.creditType,p.direction]);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p);}
  let exitFee=dec(0),exitTax=dec(0);
  for(const ps of groups.values()){
@@ -37,10 +41,10 @@ export function valueAccount(book,market,date,accountId=null){
    }
   }catch(e){missing=true;warnings.push(`${ps[0].code} 平倉費用待核對：${e.message}`);for(const p of ps){p.unrealized=null;p.exitFee=null;p.exitTax=null;}}
  }
- return ok({...s,positions,markedEquity:s.equity,equity:missing?null:dec(s.equity).minus(exitFee).minus(exitTax).toString(),exitFee:missing?null:exitFee.toString(),exitTax:missing?null:exitTax.toString(),quality:missing?'insufficient':s.quality,warnings});
+ return ok({...s,positions,manualPrices:manual,markedEquity:s.equity,equity:missing?null:dec(s.equity).minus(exitFee).minus(exitTax).toString(),exitFee:missing?null:exitFee.toString(),exitTax:missing?null:exitTax.toString(),quality:missing?'insufficient':manual.length&&s.quality==='complete'?'estimated':s.quality,warnings});
 }
 export function buildSnapshots(book,market,toDate,accountId=null){
- try{const out=[];let base=null,previous=null;for(const date of datesBetween(book.openingDate,toDate)){
+ try{book={...book,valuationPrices:(book.valuationPrices??[]).filter(q=>q.date===toDate)};const out=[];let base=null,previous=null;for(const date of datesBetween(book.openingDate,toDate)){
   const s=unwrap(valueAccount(book,market,date,accountId));if(!out.length)base=s.equity;
   out.push({...s,pnl:s.equity!=null&&previous!=null?dec(s.equity).minus(previous).toString():null,return:s.equity!=null&&base!=null&&dec(base).gt(0)?dec(s.equity).div(base).minus(1).toString():null});previous=s.equity;
  }return ok(out);}catch(e){return err('LIQUIDATION_FAILED',e.message);}

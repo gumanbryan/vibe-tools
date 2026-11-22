@@ -1,3 +1,4 @@
+import {setManualPrices,activeManualPrices} from './market/manual-prices.js';
 import {resolveCashDayAllocations} from './ledger/day-pairs.js';
 import {strategyCampaigns} from './performance/strategy-campaigns.js';
 import {strategy,strategyChoice,realizedDetail,campaignDetail} from './ui/pages/strategy.js';
@@ -276,7 +277,7 @@ function makeView() {
 }
 function shell(content, page, title) {
   const hasBook = !!state.book;
-  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.19</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>收盤資料</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", strategy: "追蹤處置股策略的買賣與自備資金報酬。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>${E(marketStatusText(state.market))}</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
+  return `<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-mark">${icon(1)}</span><div>日見<span>DAILY EQUITY</span></div></a><div class="nav-label">投資工作台</div><nav>${nav.map(([id, label], i) => `<a href="#${id}" class="nav-item ${id === page ? "active" : ""}">${icon(i)}<span>${label}</span>${id === "events" ? '<span class="nav-count" aria-hidden="true">●</span>' : ""}</a>`).join("")}</nav><div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span>資料僅儲存於本機</div><p>你的投資紀錄，留在你的瀏覽器。</p><span class="version">DAILY EQUITY · v0.20</span></div></aside><div class="workspace"><header class="topbar"><span class="breadcrumb">投資工作台 <span>/</span> <strong>${E(title)}</strong></span><div class="topbar-right"><span class="status-pill"><span class="status-dot"></span>${state.book&&state.market&&activeManualPrices(state.book,state.market,state.date).length?"含手動暫估":"收盤資料"}</span><span class="avatar">${state.book?.demo ? "DE" : "ME"}</span></div></header><main><div class="page-header"><div><div class="eyebrow">YOUR DAILY INVESTMENT VIEW</div><h1>${E(title)}</h1><p>${page === "overview" ? "讓資產變化有跡可循，讓每一天的決策更清晰。" : ({ positions: "管理每個部位，記錄每一筆決策。", strategy: "追蹤處置股策略的買賣與自備資金報酬。", accounting: "釐清每一筆收付，看見完整的資產與負債。", market: "從大盤趨勢到產業輪動，掌握市場節奏。", events: "重要持股事件，以及需要你確認的權益。", settings: "讓帳務規則、資料與備份都在掌握之中。" }[page] ?? "建立你的每日投資工作台。")}</p></div>${hasBook ? `<div class="page-tools">${state.book.demo ? '<span class="badge lavender">模擬帳本</span>' : ""}<select id="account-select" aria-label="選擇帳戶"><option value="all">全部帳戶</option>${state.book.accounts.map((a) => `<option value="${E(a.id)}" ${state.account === a.id ? "selected" : ""}>${E(a.name)}</option>`).join("")}</select><input type="date" id="asof-date" aria-label="估值日期" value="${E(state.date)}" min="${E(state.book.openingDate)}" max="${taipeiToday()}">${["#settings", "#recovery"].includes(location.hash) ? "" : button("trade", "＋ 新增交易", "primary")}</div>` : ""}</div>${content}<footer><span>${E(marketStatusText(state.market))}</span><span>淨值含股利與費用 · 個人帳務不會上傳</span></footer></main></div>`;
 }
 function render() {
   try {
@@ -800,6 +801,22 @@ async function action(name, target) {
       ? makeView()
       : null;
   switch (name) {
+    case "valuation-prices": {
+      const view=makeView(),codes=[...new Set(view.latest.positions.map(p=>p.code))];
+      if(!codes.length){toast('目前沒有可設定估值價格的持股');break;}
+      const quotes=new Map(activeManualPrices(state.book,state.market,state.date).map(q=>[q.code,q]));
+      dialog('當日手動估值價格',note(`估值日期 ${state.date}。同股票全部現股與融資持股共用此價格；留空恢復官方收盤價。只調整估值，不新增買賣、改動成交價或現金分錄。`)+`<div class="valuation-price-form">`+codes.map(code=>{
+        const base=latestPrice(state.market,code,state.date),quote=quotes.get(code);
+        return field('quote:'+code,code+' '+view.securityName(code),'number',quote?.price??'','min="0.000001" step="any"')+`<small>最新可用收盤價：${num(base?.close,2)} · ${E(base?.date??'無資料')}${quote?' · 已設定手動暫估':''}</small>`;
+      }).join('')+`</div>`+note('手動價格只適用指定估值日。官方補上該日收盤，或原參考收盤修訂後，暫估自動失效。下個日期使用官方最新收盤價。')+button('valuation-clear','清除當日手動估值','secondary'),async f=>{
+        const draft=setManualPrices(state.book,state.market,state.date,codes.map(code=>({code,price:f['quote:'+code]})));
+        await save(draft,'手動估值價格',state.date+' '+codes.join('、'));
+      },'套用估值');break;
+    }
+    case "valuation-clear": {
+      const draft=structuredClone(state.book);draft.valuationPrices=(draft.valuationPrices??[]).filter(q=>q.date!==state.date);
+      modal.close();await save(draft,'清除當日手動估值',state.date);break;
+    }
     case "campaign-detail": {
       const view=makeView(),cycle=strategyCampaigns(view.book,view.latest).cycles.find(c=>c.id===target.dataset.id);
       if(cycle)dialog('策略單明細',campaignDetail(cycle,view.securityName),async()=>{},'關閉');break;

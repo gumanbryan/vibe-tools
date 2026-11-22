@@ -32,7 +32,7 @@ export function positions(v) {
         badge(credit[p.creditType] ?? p.creditType),
         num(p.qty),
         num(p.price, 2),
-        `${num(p.marketPrice, 2)}<small class="block">${E(p.priceDate)}</small>`,
+        `${num(p.marketPrice, 2)}<small class="block">${E(p.priceDate)}${p.manualPrice?' · 手動暫估':''}</small>`,
         num(p.marketValue),
         `<button type="button" class="value-link ${color(p.unrealized)}" data-action="position-detail" data-id="${E(p.id)}">${signed(p.unrealized)} ↗</button>`,
         p.members.length>1 ? button("position-detail","查看批次","ghost",`data-id="${E(p.id)}"`) : p.opening ? button("edit-opening","編輯起始持股","ghost",`data-id="${E(p.id)}"`)+button("delete-opening", "刪除起始持股", "ghost", `data-id="${E(p.id)}"`) : "請至交易紀錄操作",
