@@ -11,11 +11,10 @@ concurrency:
   group: pages
   cancel-in-progress: false
 jobs:
-  deploy:
+  build:
+    name: Build and upload website
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -27,8 +26,62 @@ jobs:
       - run: npm run build
       - run: node scripts/data/check-size.mjs --site dist
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
+      - name: Upload website once
+        uses: actions/upload-pages-artifact@v4
         with:
+          name: github-pages
           path: dist
-      - id: deployment
+
+  deploy:
+    name: Deploy uploaded website
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url || steps.deployment_final.outputs.page_url }}
+    steps:
+      # ArtifactService visibility can lag a successful upload. Retry only the
+      # deployment, never the upload (which could create duplicate artifacts).
+      - name: Deploy to GitHub Pages
+        id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages
+      - name: Wait before second deployment attempt
+        if: ${{ steps.deployment.outcome == 'failure' }}
+        run: sleep 20
+      - name: Retry deployment
+        id: deployment_retry
+        if: ${{ steps.deployment.outcome == 'failure' }}
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages
+      - name: Wait before final deployment attempt
+        if: ${{ steps.deployment_retry.outcome == 'failure' }}
+        run: sleep 40
+      - name: Final deployment attempt
+        id: deployment_final
+        if: ${{ steps.deployment_retry.outcome == 'failure' }}
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages
+      - name: Deployment summary
+        if: ${{ always() }}
+        env:
+          FIRST_RESULT: ${{ steps.deployment.outcome }}
+          SECOND_RESULT: ${{ steps.deployment_retry.outcome }}
+          FINAL_RESULT: ${{ steps.deployment_final.outcome }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url || steps.deployment_final.outputs.page_url }}
+        shell: bash
+        run: |
+          printf '## Pages 部署結果\n\n' >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$FIRST_RESULT" == success || "$SECOND_RESULT" == success || "$FINAL_RESULT" == success ]]; then
+            printf '網站已部署完成：%s\n\n' "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
+            printf '各次嘗試：%s / %s / %s\n' "$FIRST_RESULT" "$SECOND_RESULT" "$FINAL_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '部署未完成。建置與上傳成功，但部署仍失敗；請查看本次部署步驟的錯誤紀錄。\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
